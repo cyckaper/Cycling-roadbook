@@ -1,5 +1,5 @@
 // 小布路書 離線殼層 v2.2 — 同源檔案 stale-while-revalidate;/api/ 一律直通網路;字型機會性快取
-const V = 'xb-v240';
+const V = 'xb-v241';
 const CORE = ['./','./manifest.webmanifest','./vendor/leaflet/leaflet.css','./vendor/leaflet/leaflet.js','./icon-192.png','./icon-512.png'];
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(V).then(c => c.addAll(CORE)).catch(()=>{}));

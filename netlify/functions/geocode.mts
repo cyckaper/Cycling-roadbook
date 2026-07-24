@@ -18,7 +18,6 @@ export default async (req) => {
   const NEAR_KM = 250;
   const byNear = rs => bias ? rs.slice().sort((a, b) =>
     hav(bias.la, bias.ln, a.lat, a.lng) - hav(bias.la, bias.ln, b.lat, b.lng)) : rs;
-  const vars = variants(q);
 
   const gkey = Netlify.env.get("GOOGLE_MAPS_API_KEY");
   let results = [], source = "none";
@@ -37,23 +36,17 @@ export default async (req) => {
 
   if (!results.length) {
     if (bias && nearTW) {
-      for (const qq of vars) {
-        results = await nominatim([qq, region].filter(Boolean).join(" "), "tw", bias, 0.15);
-        if (results.length) { source = "osm"; break; }
-      }
+      results = await nominatim([q, region].filter(Boolean).join(" "), "tw", bias, 0.15);
+      if (results.length) source = "osm";
     }
     if (!results.length && nearTW) {
-      for (const qq of vars) {
-        results = byNear(await nominatim([qq, region, "台灣"].filter(Boolean).join(" "), "tw", null, 0));
-        if (results.length) { source = "osm"; break; }
-      }
+      results = byNear(await nominatim([q, region, "台灣"].filter(Boolean).join(" "), "tw", null, 0));
+      if (results.length) source = "osm";
     }
     if (!results.length) {
-      for (const qq of vars) {
-        let glob = await nominatim([qq, region].filter(Boolean).join(" "), null, null, 0);
-        if (bias) glob = byNear(glob.filter(r => hav(bias.la, bias.ln, r.lat, r.lng) <= NEAR_KM));
-        if (glob.length) { results = glob; source = "osm"; break; }
-      }
+      let glob = await nominatim([q, region].filter(Boolean).join(" "), null, null, 0);
+      if (bias) glob = byNear(glob.filter(r => hav(bias.la, bias.ln, r.lat, r.lng) <= NEAR_KM));
+      if (glob.length) { results = glob; source = "osm"; }
     }
   }
 
@@ -103,14 +96,6 @@ async function nominatim(query, countrycodes, box, half) {
   } catch (e) { return []; }
 }
 
-function variants(q) {
-  const v = [q];
-  if (/火車站$/.test(q)) { v.push(q.replace(/火車站$/, "車站"), q.replace(/火車站$/, "站")); }
-  else if (/車站$/.test(q)) { v.push(q.replace(/車站$/, "火車站")); }
-  else if (/站$/.test(q) && !/(捷運站)$/.test(q)) { v.push(q.replace(/站$/, "車站")); }
-  if (/浴場$/.test(q) && !/海水浴場$/.test(q)) v.push(q.replace(/浴場$/, "海水浴場"));
-  return [...new Set(v)].slice(0, 3);
-}
 function hav(a, b, c, d) {
   const R = 6371, r = x => x * Math.PI / 180;
   const dLa = r(c - a), dLn = r(d - b);

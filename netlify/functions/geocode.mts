@@ -16,15 +16,20 @@ export default async (req) => {
   }
   const nearTW = bias ? (bias.la > 20 && bias.la < 27 && bias.ln > 118 && bias.ln < 123.5) : true;
   const NEAR_KM = 250;
-  const byNear = rs => bias ? rs.slice().sort((a, b) =>
-    hav(bias.la, bias.ln, a.lat, a.lng) - hav(bias.la, bias.ln, b.lat, b.lng)) : rs;
+  const rank = rs => rs.slice().sort((a, b) => {
+    const sc = nn => nn === q ? 0
+      : (nn.startsWith(q) || (q.startsWith(nn) && nn.length >= q.length * 0.8)) ? 0
+      : nn.includes(q) ? 1 : q.includes(nn) ? 3 : 2;
+    return sc(a.name) - sc(b.name)
+      || (bias ? hav(bias.la, bias.ln, a.lat, a.lng) - hav(bias.la, bias.ln, b.lat, b.lng) : 0);
+  });
 
   const gkey = Netlify.env.get("GOOGLE_MAPS_API_KEY");
   let results = [], source = "none";
 
   if (gkey) {
     if (nearTW) {
-      results = byNear(await gPlaces(gkey, region ? `${q} ${region}` : `${q} 台灣`, "zh-TW", "TW", bias));
+      results = rank(await gPlaces(gkey, region ? `${q} ${region}` : `${q} 台灣`, "zh-TW", "TW", bias));
       if (results.length) source = "google";
     }
     if (!results.length) {
@@ -36,16 +41,16 @@ export default async (req) => {
 
   if (!results.length) {
     if (bias && nearTW) {
-      results = await nominatim([q, region].filter(Boolean).join(" "), "tw", bias, 0.15);
+      results = rank(await nominatim([q, region].filter(Boolean).join(" "), "tw", bias, 0.15));
       if (results.length) source = "osm";
     }
     if (!results.length && nearTW) {
-      results = byNear(await nominatim([q, region, "台灣"].filter(Boolean).join(" "), "tw", null, 0));
+      results = rank(await nominatim([q, region, "台灣"].filter(Boolean).join(" "), "tw", null, 0));
       if (results.length) source = "osm";
     }
     if (!results.length) {
       let glob = await nominatim([q, region].filter(Boolean).join(" "), null, null, 0);
-      if (bias) glob = byNear(glob.filter(r => hav(bias.la, bias.ln, r.lat, r.lng) <= NEAR_KM));
+      if (bias) glob = rank(glob.filter(r => hav(bias.la, bias.ln, r.lat, r.lng) <= NEAR_KM));
       if (glob.length) { results = glob; source = "osm"; }
     }
   }

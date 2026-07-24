@@ -17,8 +17,14 @@ export default async (req) => {
 
   let body;
   try { body = await req.json(); } catch { return json({ error: "invalid JSON body" }, 400); }
-  const text = String(body.text || "").slice(0, 8000);
+  let text = String(body.text || "").slice(0, 8000);
   if (!text.trim()) return json({ error: "empty text" }, 400);
+  // 內文擴充：偵測第一個網址，伺服器代抓文章（含短網址轉址），一併餵給模型
+  const um = text.match(/https?:\/\/[^\s"'<>）)】]+/);
+  if (um) {
+    const page = await fetchArticle(um[0]);
+    if (page) text = (text + "\n\n【連結內文（自動抓取）】\n" + page).slice(0, 14000);
+  }
 
   const model = Netlify.env.get("EXTRACT_MODEL") || "claude-sonnet-4-6";
   let r;
@@ -61,6 +67,23 @@ export default async (req) => {
   return json({ waypoints, model });
 };
 
+async function fetchArticle(u) {
+  try {
+    const ctl = new AbortController(); const to = setTimeout(() => ctl.abort(), 6000);
+    const r = await fetch(u, { signal: ctl.signal, redirect: "follow",
+      headers: { "user-agent": "Mozilla/5.0 (compatible; xiaobu-roadbook)", "accept": "text/html,*/*" } });
+    clearTimeout(to);
+    if (!r.ok) return null;
+    const ct = r.headers.get("content-type") || "";
+    if (!/html|text/i.test(ct)) return null;
+    let html = await r.text();
+    const title = (html.match(/<title[^>]*>([^<]{0,200})/i) || [])[1] || "";
+    html = html.replace(/<script[\s\S]*?<\/script>/gi, " ").replace(/<style[\s\S]*?<\/style>/gi, " ")
+               .replace(/<[^>]+>/g, " ").replace(/&nbsp;|&#160;/g, " ").replace(/&amp;/g, "&")
+               .replace(/\s+/g, " ").trim();
+    return ((title ? title + "\n" : "") + html.slice(0, 5000)) || null;
+  } catch (e) { return null; }
+}
 function extractJson(s) {
   s = String(s).replace(/```json|```/g, "").trim();
   const a = s.indexOf("{"), b = s.lastIndexOf("}");

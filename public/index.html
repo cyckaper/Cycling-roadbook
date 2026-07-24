@@ -396,15 +396,55 @@ function inferZone(p){
   return "basin";
 }
 // ---------- geocode search: return multiple suggestions (Open-Meteo, CORS-friendly) ----------
+const XB_NOMI='https://nominatim.openstreetmap.org/search';
+function xbVariants(q){
+  const v=[q];
+  if(/火車站$/.test(q)){ v.push(q.replace(/火車站$/,'車站')); }
+  else if(/車站$/.test(q)){ v.push(q.replace(/車站$/,'火車站')); }
+  else if(/站$/.test(q)&&!/捷運站$/.test(q)){ v.push(q.replace(/站$/,'車站')); }
+  if(/浴場$/.test(q)&&!/海水浴場$/.test(q)) v.push(q.replace(/浴場$/,'海水浴場'));
+  return [...new Set(v)].slice(0,2);
+}
+async function xbNomi(params){
+  const r=await fetch(XB_NOMI+'?format=json&accept-language=zh-TW,en&limit=3&'+params);
+  if(!r.ok) throw new Error('nominatim '+r.status);
+  const j=await r.json();
+  return (j||[]).map(p=>({name:(p.display_name||'').split(',')[0],address:p.display_name||'',lat:+p.lat,lng:+p.lon}))
+                .filter(p=>isFinite(p.lat)&&isFinite(p.lng));
+}
+async function xbGeocode(qn, region, near){
+  // 第一發:伺服器(設了 GOOGLE_MAPS_API_KEY 時語意定位一發即中;無鑰時單次 Nominatim)
+  try{
+    const p=new URLSearchParams({q:qn}); if(region)p.set('region',region);
+    if(near)p.set('near',near.lat+','+near.lng);
+    const r=await fetch(API('/api/geocode?')+p.toString());
+    if(r.ok){ const j=await r.json(); if(j.results&&j.results.length) return j.results; }
+  }catch(e){}
+  // 直連 Nominatim:住宅 IP、至多 4 發、間隔 300ms;視窗→台灣→同義→全球(閘門+排序)
+  const nearTW = near ? (near.lat>20&&near.lat<27&&near.lng>118&&near.lng<123.5) : true;
+  const H=x=>haversine({lat:x.lat,lng:x.lng},near);
+  const vars=xbVariants(qn);
+  const tries=[];
+  if(near&&nearTW){ const hb=0.15, vb=`viewbox=${(near.lng-hb).toFixed(3)},${(near.lat+hb).toFixed(3)},${(near.lng+hb).toFixed(3)},${(near.lat-hb).toFixed(3)}&bounded=1`;
+    tries.push({p:`countrycodes=tw&${vb}&q=`+encodeURIComponent(vars[0])}); }
+  if(nearTW) for(const v of vars) tries.push({p:'countrycodes=tw&q='+encodeURIComponent(v+' 台灣')});
+  tries.push({p:'q='+encodeURIComponent(vars[0]+(region?' '+region:'')), glob:true});
+  for(const t of tries.slice(0,4)){
+    try{
+      let rs=await xbNomi(t.p);
+      if(t.glob && near) rs=rs.filter(x=>H(x)<=250);
+      if(near) rs=rs.slice().sort((a,b)=>H(a)-H(b));
+      if(rs.length) return rs;
+    }catch(e){ console.warn('[定位]', String(e&&e.message||e)); }
+    await new Promise(r=>setTimeout(r,300));
+  }
+  return null;
+}
 async function searchGeocode(q){
   try{
-    const p=new URLSearchParams({q});
-    const lastW=WAYPOINTS[WAYPOINTS.length-1];
-    if(lastW) p.set('near', lastW.lat+','+lastW.lng);
-    const res=await fetch(API('/api/geocode?')+p.toString());
-    if(!res.ok) return {err:true};
-    const j=await res.json();
-    return {results:(j.results||[]).map(r=>({
+    const lastW=WAYPOINTS[WAYPOINTS.length-1]||null;
+    const rs=await xbGeocode(q, "", lastW);
+    return {results:(rs||[]).slice(0,5).map(r=>({
       n:r.name, lat:r.lat, lng:r.lng, elev:null,
       region:(r.address||"").split(",")[1]?.trim()||""
     }))};
@@ -770,7 +810,7 @@ zh:{
  bl_downS:'<i style="background:#4A6076"></i>陡降 低於−8%',
  mSummary:"這些時刻怎麼算？——834 趟實騎的校準方法",
  mBody:"<p>本站的抵達時刻不是理論值，而是從車主 2018–2026 年間以 Brompton 實際完成、記錄於 Komoot 的 939 趟騎乘中校準出來的。剔除非單車活動、短於 3 公里或缺時間戳的紀錄後，留下 <b>834 趟、約 31,790 公里、六百二十萬個軌跡點</b>。</p><p>每條軌跡先做高程清理：沿線以 ±100 公尺視窗中位數濾波去除尖刺，再每 30 公尺重取樣、±60 公尺移動平均平滑；坡度取 ±50 公尺視窗的高差比，據此把每一小段歸入七個坡度帶——陡降（≤−8%）、下坡、平路（−2〜2%）、緩坡、陡坡、很陡、極陡（&gt;12%）。</p><p>速度統計剔除近乎靜止（&lt;1.5 km/h）、GPS 突跳（&gt;80 km/h）與錄製斷點（相鄰點時距 ≥10 秒的橋接段）後，各帶採<b>有效速度＝Σ距離 ÷ Σ移動時間</b>——而非平均巡航速度：慢的路段按時間放大權重，算出來的才是「抵達時刻」真正需要的數字。樣本以近 24 個月為主，不足的帶回退全庫。</p><p>交叉驗證：全庫算得的平路有效速度 16.3 km/h，與另一趟獨立實騎量得、並通過沿線抵達時刻三分鐘誤差檢驗的 16.2 幾乎重合；各爬坡帶亦互相印證。唯一例外是極陡帶，樣本僅 29 公里且受高程雜訊污染，故採保守值。各帶數值見頁尾；每點停留時間由上方欄位另行輸入，不混入配速。</p>",
- colophon:'<b>小布路書</b> · Brompton Roadbook（原「單車騎行農民曆」）· 版本 <b>v2.4.1</b>（2026-07-24）<br>© 2026 Chang Chun-Yen · HEALS Design · 版權所有，未經授權請勿轉載<br>路線、坡度、天氣皆為推估，僅供參考；騎乘安全請自行評估。<br>路線距離＝直線距離 × 1.3 迂迴係數；爬升＝海拔差 + 每公里起伏估算；ETA 依坡度分段配速（平路16.3・緩坡12・陡坡8.2・很陡6.6・極陡4.5・下坡21.2・陡降19.7 km/h，2024–2026 Komoot 834 趟完騎有效速度校準）與每點停留推算；頂／順風由每段方位角與當時風向相減。<br>地名座標來自 Open-Meteo Geocoding 與 OpenStreetMap Nominatim、海拔來自 Open-Meteo；天氣為示範情境，實際以出發當日之逐時預報與現場風雨為準。',
+ colophon:'<b>小布路書</b> · Brompton Roadbook（原「單車騎行農民曆」）· 版本 <b>v2.4.2</b>（2026-07-24）<br>© 2026 Chang Chun-Yen · HEALS Design · 版權所有，未經授權請勿轉載<br>路線、坡度、天氣皆為推估，僅供參考；騎乘安全請自行評估。<br>路線距離＝直線距離 × 1.3 迂迴係數；爬升＝海拔差 + 每公里起伏估算；ETA 依坡度分段配速（平路16.3・緩坡12・陡坡8.2・很陡6.6・極陡4.5・下坡21.2・陡降19.7 km/h，2024–2026 Komoot 834 趟完騎有效速度校準）與每點停留推算；頂／順風由每段方位角與當時風向相減。<br>地名座標來自 Open-Meteo Geocoding 與 OpenStreetMap Nominatim、海拔來自 Open-Meteo；天氣為示範情境，實際以出發當日之逐時預報與現場風雨為準。',
  todayTerm:"今日節氣", yiChar:"宜", jiChar:"忌",
  emptyRoute:"打字搜尋地點、從清單挑選加入（或點熱門騎點）；湊滿兩點、設好出發時間與停留，按「開始分析」讀今天這條路線的天時。",
  statusGood:"今日宜騎", statusWarn:"可騎 · 留意時段", statusRisk:"審慎 · 有挑戰路段",
@@ -845,7 +885,7 @@ en:{
  bl_downS:'<i style="background:#4A6076"></i>Steep down <−8%',
  mSummary:"How are these times computed? — calibrated on 834 real rides",
  mBody:"<p>Arrival times here are not theoretical. They are calibrated from 939 rides the owner actually completed on a Brompton between 2018–2026, recorded on Komoot. After removing non-cycling activities, rides under 3 km, and files without timestamps, <b>834 rides remain — about 31,790 km and 6.2 million track points</b>.</p><p>Each track first gets elevation cleaning: a ±100 m median filter along the line removes spikes, then 30 m resampling and a ±60 m moving average smooth the profile; grade is taken over a ±50 m window, and every short segment is assigned to one of seven bands — steep descent (≤−8%), downhill, flat (−2〜2%), gentle, steep, very steep, extreme (&gt;12%).</p><p>After excluding near-standstill samples (&lt;1.5 km/h), GPS spikes (&gt;80 km/h) and recording gaps (bridged segments with ≥10 s between points), each band uses <b>effective speed = Σdistance ÷ Σmoving time</b> — not average cruising speed: slow stretches are weighted by time, which is exactly what an arrival time needs. Samples favour the last 24 months, falling back to the full library where thin.</p><p>Cross-check: the library-wide flat effective speed of 16.3 km/h almost exactly matches 16.2 measured independently on a single ride that passed a 3-minute arrival-time test; climbing bands corroborate each other likewise. The one exception is the extreme band — only 29 km of noisy samples — so a conservative value is used. Band values are in the footer; stop time per waypoint is entered above and never mixed into pace.</p>",
- colophon:'<b>小布路書</b> · Xiaobu Roadbook — a Brompton Roadbook (formerly “A Cyclist’s Almanac”) · Version <b>v2.4.1</b> (2026-07-24)<br>© 2026 Chang Chun-Yen · HEALS Design · All rights reserved<br>Routes, grades and weather are estimates for reference only; assess riding safety yourself.<br>Fallback route length = straight-line × 1.3; climb = elevation gap + per-km undulation. ETA uses graded pace (flat 16.3 · gentle 12 · steep 8.2 · v-steep 6.6 · extreme 4.5 · down 21.2 · steep-down 19.7 km/h, effective speeds calibrated on 834 Komoot rides 2024–2026) plus stop time per waypoint; head/tailwind from segment bearing vs. hourly wind.<br>Geocoding by Open-Meteo Geocoding & OpenStreetMap Nominatim; elevation by Open-Meteo. Demo weather is illustrative — trust the day’s forecast and conditions on the road.',
+ colophon:'<b>小布路書</b> · Xiaobu Roadbook — a Brompton Roadbook (formerly “A Cyclist’s Almanac”) · Version <b>v2.4.2</b> (2026-07-24)<br>© 2026 Chang Chun-Yen · HEALS Design · All rights reserved<br>Routes, grades and weather are estimates for reference only; assess riding safety yourself.<br>Fallback route length = straight-line × 1.3; climb = elevation gap + per-km undulation. ETA uses graded pace (flat 16.3 · gentle 12 · steep 8.2 · v-steep 6.6 · extreme 4.5 · down 21.2 · steep-down 19.7 km/h, effective speeds calibrated on 834 Komoot rides 2024–2026) plus stop time per waypoint; head/tailwind from segment bearing vs. hourly wind.<br>Geocoding by Open-Meteo Geocoding & OpenStreetMap Nominatim; elevation by Open-Meteo. Demo weather is illustrative — trust the day’s forecast and conditions on the road.',
  todayTerm:"Today's solar term", yiChar:"Do", jiChar:"Skip",
  emptyRoute:"Type to search and pick places (or tap a popular spot); with two or more set, choose your start time and stops, then press Analyze.",
  statusGood:"A good day to ride", statusWarn:"Rideable · mind the timing", statusRisk:"Ride with care · challenging section",
@@ -920,7 +960,7 @@ ja:{
  bl_downS:'<i style="background:#4A6076"></i>急降 −8%未満',
  mSummary:"この到着時刻はどう計算？——実走834本による校正",
  mBody:"<p>本サイトの到着時刻は理論値ではありません。オーナーが 2018–2026 年に Brompton で実際に完走し Komoot に記録した 939 本の走行から校正されています。自転車以外・3 km 未満・タイムスタンプ欠落を除き、<b>834 本・約 31,790 km・620 万トラックポイント</b>が残りました。</p><p>各トラックはまず標高クリーニング：沿線 ±100 m の中央値フィルタでスパイクを除去し、30 m ごとに再サンプル、±60 m 移動平均で平滑化。勾配は ±50 m 窓で取り、各区間を七つの帯——急降（≤−8%）・下り・平坦（−2〜2%）・緩坂・急坂・激坂・極坂（&gt;12%）——に振り分けます。</p><p>ほぼ静止（&lt;1.5 km/h）、GPS スパイク（&gt;80 km/h）、記録ギャップ（隣接点間 ≥10 秒のブリッジ区間）を除外した上で、各帯は<b>有効速度＝Σ距離 ÷ Σ移動時間</b>を採用——平均巡航速度ではありません。遅い区間ほど時間で重みが増し、それこそが「到着時刻」に必要な数字です。標本は直近 24 か月を主とし、不足帯は全期間で補完。</p><p>相互検証：全データの平坦有効速度 16.3 km/h は、独立した一本の実走で測られ沿線到着 3 分誤差の検証を通った 16.2 とほぼ一致。登坂帯も互いに整合します。唯一の例外は極坂帯（標本 29 km・ノイズ混入）で、保守値を採用。各帯の値はフッター参照。各地点の滞在時間は上の欄で別入力され、ペースには混ぜません。</p>",
- colophon:'<b>小布路書</b> · ブロンプトン・ロードブック（旧「単車騎行農民暦」）· バージョン <b>v2.4.1</b>（2026-07-24）<br>© 2026 Chang Chun-Yen · HEALS Design · 無断転載を禁じます<br>ルート・勾配・天気は推定であり参考情報です。走行の安全はご自身で判断してください。<br>簡易時：距離＝直線 × 1.3、獲得標高＝標高差＋km あたり起伏。ETA は勾配別ペース（平坦16.3・緩坂12・急坂8.2・激坂6.6・極坂4.5・下り21.2・急降19.7 km/h、2024–2026 Komoot 実走834本の有効速度で校正）と各地点滞在から算出。向かい風／追い風は区間方位と毎時風向の差。<br>地名は Open-Meteo Geocoding と OpenStreetMap Nominatim、標高は Open-Meteo。デモ天気は例示であり、当日の予報と現地の風雨を優先してください。',
+ colophon:'<b>小布路書</b> · ブロンプトン・ロードブック（旧「単車騎行農民暦」）· バージョン <b>v2.4.2</b>（2026-07-24）<br>© 2026 Chang Chun-Yen · HEALS Design · 無断転載を禁じます<br>ルート・勾配・天気は推定であり参考情報です。走行の安全はご自身で判断してください。<br>簡易時：距離＝直線 × 1.3、獲得標高＝標高差＋km あたり起伏。ETA は勾配別ペース（平坦16.3・緩坂12・急坂8.2・激坂6.6・極坂4.5・下り21.2・急降19.7 km/h、2024–2026 Komoot 実走834本の有効速度で校正）と各地点滞在から算出。向かい風／追い風は区間方位と毎時風向の差。<br>地名は Open-Meteo Geocoding と OpenStreetMap Nominatim、標高は Open-Meteo。デモ天気は例示であり、当日の予報と現地の風雨を優先してください。',
  todayTerm:"今日の節気", yiChar:"宜", jiChar:"忌",
  emptyRoute:"地名を入力して候補から追加（人気スポットのタップでも可）。2 地点以上そろえ、出発時刻と滞在を設定したら「分析開始」で天時を読みます。",
  statusGood:"本日、走るに宜し", statusWarn:"走行可 · 時間帯に注意", statusRisk:"慎重に · 難所あり",
@@ -1337,13 +1377,8 @@ async function aiParse(){
       if(eq) w = top.kind==='gaz'?wpFromGaz(top.g) : top.kind==='sta'?wpFromStation(top.s) : null;
     }
     if(!w){
-      try{
-        const q=new URLSearchParams({q:wpt.name}); if(wpt.region)q.set('region',wpt.region);
-        if(last)q.set('near',last.lat+','+last.lng);
-        const r=await fetch(API('/api/geocode?')+q.toString());
-        if(r.ok){ const g=await r.json();
-          if(g.results&&g.results[0]) w=wpFromGeo({n:wpt.name,lat:g.results[0].lat,lng:g.results[0].lng,elev:null}); }
-      }catch(e){}
+      const rs=await xbGeocode(wpt.name, wpt.region||"", last);
+      if(rs&&rs[0]) w=wpFromGeo({n:wpt.name,lat:rs[0].lat,lng:rs[0].lng,elev:null});
     }
     if(w && last && haversine(last,w)>500){ missed.push(wpt.name); }
     else if(w){ located.push(w); last=w; } else missed.push(wpt.name);
@@ -1769,7 +1804,7 @@ document.getElementById('aiBtn').addEventListener('click', aiParse);
 document.getElementById('goBtn').addEventListener('click', ()=>analyze());
 document.getElementById('gpxBtn').addEventListener('click', downloadGpx);
 loadTdxStations();
-console.log("小布路書 v2.4.1 (2026-07-24) · zh/en/ja · 離線快照＋沿線補給 · Komoot 834趟有效速度校準");
+console.log("小布路書 v2.4.2 (2026-07-24) · zh/en/ja · 離線快照＋沿線補給 · Komoot 834趟有效速度校準");
 document.querySelectorAll('.lang-sw button').forEach(b=>b.addEventListener('click',()=>setLang(b.dataset.lang)));
 applyStatic();
 renderWaypoints();

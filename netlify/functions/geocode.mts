@@ -1,7 +1,7 @@
-// 地名定位：Google Places（涵蓋小店與地標）→ 查無或未設金鑰時退 OpenStreetMap
-// 兩段式：先以台灣為優先範圍（保住雙溪、新城等同名地的在地判讀），
-// 查無結果時放寬為全球重試（支援海外路線，如 Urbana / Homer Lake）。
-// near（前一定位點）作 30km 圓形偏置，讓同一趟的地名彼此靠攏。
+// 地名定位 v2.4：三段式含合理性閘門
+// 1a) 有前點(near)時先以 ±0.5° 視窗在台灣找(串鏈地名就近解析)
+// 1b) 台灣全域
+// 2)  全球備援——但有 near 時，候選必須落在 near 250 km 內，否則寧可回空（略過勝於瞬移）
 export default async (req) => {
   const url = new URL(req.url);
   const q = (url.searchParams.get("q") || "").trim();
@@ -15,6 +15,7 @@ export default async (req) => {
     if (isFinite(la) && isFinite(ln)) bias = { la, ln };
   }
   const nearTW = bias ? (bias.la > 20 && bias.la < 27 && bias.ln > 118 && bias.ln < 123.5) : true;
+  const NEAR_KM = 250;
 
   const gkey = Netlify.env.get("GOOGLE_MAPS_API_KEY");
   let results = [], source = "none";
@@ -25,19 +26,25 @@ export default async (req) => {
       if (results.length) source = "google";
     }
     if (!results.length) {
-      results = await gPlaces(gkey, region ? `${q} ${region}` : q, null, null, bias);
-      if (results.length) source = "google";
+      let glob = await gPlaces(gkey, region ? `${q} ${region}` : q, null, null, bias);
+      if (bias) glob = glob.filter(r => hav(bias.la, bias.ln, r.lat, r.lng) <= NEAR_KM);
+      if (glob.length) { results = glob; source = "google"; }
     }
   }
 
   if (!results.length) {
-    if (nearTW) {
-      results = await nominatim([q, region, "台灣"].filter(Boolean).join(" "), "tw");
+    if (bias && nearTW) {
+      results = await nominatim([q, region].filter(Boolean).join(" "), "tw", bias, 0.5);
+      if (results.length) source = "osm";
+    }
+    if (!results.length && nearTW) {
+      results = await nominatim([q, region, "台灣"].filter(Boolean).join(" "), "tw", null, 0);
       if (results.length) source = "osm";
     }
     if (!results.length) {
-      results = await nominatim([q, region].filter(Boolean).join(" "), null);
-      if (results.length) source = "osm";
+      let glob = await nominatim([q, region].filter(Boolean).join(" "), null, null, 0);
+      if (bias) glob = glob.filter(r => hav(bias.la, bias.ln, r.lat, r.lng) <= NEAR_KM);
+      if (glob.length) { results = glob; source = "osm"; }
     }
   }
 
@@ -69,12 +76,13 @@ async function gPlaces(key, textQuery, lang, regionCode, bias) {
   } catch (e) { return []; }
 }
 
-async function nominatim(query, countrycodes) {
+async function nominatim(query, countrycodes, box, half) {
   try {
     const cc = countrycodes ? "&countrycodes=" + countrycodes : "";
+    const vb = box ? `&viewbox=${(box.ln - half).toFixed(3)},${(box.la + half).toFixed(3)},${(box.ln + half).toFixed(3)},${(box.la - half).toFixed(3)}&bounded=1` : "";
     const r = await fetch(
-      "https://nominatim.openstreetmap.org/search?format=json&accept-language=zh-TW,en&limit=3" + cc + "&q=" + encodeURIComponent(query),
-      { headers: { "User-Agent": "cycling-almanac-netlify-function", "Accept": "application/json" } }
+      "https://nominatim.openstreetmap.org/search?format=json&accept-language=zh-TW,en&limit=3" + cc + vb + "&q=" + encodeURIComponent(query),
+      { headers: { "User-Agent": "cycling-roadbook-netlify-function", "Accept": "application/json" } }
     );
     if (!r.ok) return [];
     const j = await r.json();
@@ -86,10 +94,15 @@ async function nominatim(query, countrycodes) {
   } catch (e) { return []; }
 }
 
-function json(obj, status = 200) {
-  return new Response(JSON.stringify(obj), {
-    status, headers: { "content-type": "application/json; charset=utf-8" },
-  });
+function hav(a, b, c, d) {
+  const R = 6371, r = x => x * Math.PI / 180;
+  const dLa = r(c - a), dLn = r(d - b);
+  const s = Math.sin(dLa / 2) ** 2 + Math.cos(r(a)) * Math.cos(r(c)) * Math.sin(dLn / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(s));
+}
+
+function json(o, s = 200) {
+  return new Response(JSON.stringify(o), { status: s, headers: { "content-type": "application/json; charset=utf-8" } });
 }
 
 export const config = { path: "/api/geocode" };

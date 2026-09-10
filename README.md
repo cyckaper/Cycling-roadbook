@@ -5,15 +5,19 @@
 ## 架構
 
 ```
-public/index.html            前端（由 build.py 產生；含節氣農民曆、路線引擎、地圖）
+public/index.html            前端 —— 產生物：由 build.py 產生，請勿直接編輯（含節氣農民曆、路線引擎、地圖）
+public/sw.js                 離線殼層 Service Worker（首頁網路優先，其餘同源資產 stale-while-revalidate；改版時遞增 V 快取版本）
+public/manifest.webmanifest  PWA 資訊清單
 public/vendor/leaflet/       地圖函式庫（已內建，不靠 CDN）
 netlify/functions/
   extract.mts    /api/extract   AI 地名抽取（Anthropic API）
   geocode.mts    /api/geocode   地名定位（Google Places → OSM 備援）
   route.mts      /api/route     真實自行車路網（OpenRouteService：幾何+海拔+逐步指示）
   matrix.mts     /api/matrix    路網距離矩陣（撤退車站驗證）
+  supply.mts     /api/supply    沿線補給點：超商／公廁／飲水（OpenStreetMap Overpass）
+  weather.mts    /api/weather   逐時天氣（CWA 鄉鎮逐3小時預報 → Open-Meteo 備援）
   tdx-stations.mts /api/stations 台鐵全站清單（TDX，選用）
-build.py                     前端產生器：python3 build.py → public/index.html
+build.py                     前端唯一來源：騎點庫／車站／節氣資料 + HTML 模板；python3 build.py → public/index.html
 ```
 
 分工原則：**AI 負責讀懂（文字→地名序列），地圖服務負責定位與路網（座標、路徑、坡度、距離），前端引擎負責天時（ETA、風向、風險、節氣）**。任一外部服務不可用時，前端自動降級為直線推估並如實標示，不會靜默給錯。
@@ -29,6 +33,7 @@ build.py                     前端產生器：python3 build.py → public/index
 | `ORS_API_KEY` | 路網/坡度/撤退必要 | /api/route、/api/matrix | openrouteservice.org 免費註冊（directions 2000 次/日、matrix 500 次/日） |
 | `GOOGLE_MAPS_API_KEY` | 建議 | 小店級地標定位 | Google Cloud 啟用 **Places API (New)**；未設時退 OSM，涵蓋率較低 |
 | `TDX_CLIENT_ID` / `TDX_CLIENT_SECRET` | 選用 | 台鐵全站清單 | tdx.transportdata.tw；未設時用內建約 130 站 |
+| `CWA_API_KEY` | 建議 | /api/weather 逐時天氣 | opendata.cwa.gov.tw 註冊取得授權碼；未設時退 Open-Meteo，來源如實標示 |
 | `EXTRACT_MODEL` | 選用 | 覆寫抽取模型 | 預設 `claude-sonnet-4-6` |
 
 ## 部署後驗證清單
@@ -49,4 +54,13 @@ build.py                     前端產生器：python3 build.py → public/index
 
 ## 開發
 
-改前端 → 編輯 `build.py` → `python3 build.py`。本機整合測試：`netlify dev`（需 Netlify CLI 與環境變數）。`test-fns.mjs` 為 Functions 的離線單元測試（`node --experimental-strip-types test-fns.mjs`）。
+**`public/index.html` 是產生物，請勿直接編輯。** 所有前端改動都在 `build.py`，流程如下：
+
+1. 編輯 `build.py`：騎點庫 `GAZ`、車站 `STATIONS`、二十四節氣 `TERMS` 與起日 `TERM_STARTS` 是檔案上方的 Python 資料；HTML／CSS／JS 在下方的 `TEMPLATE`（內含 `/*__GAZ__*/` 等四個佔位符，執行時以 JSON 填入）。
+2. 執行 `python3 build.py`，重新產生 `public/index.html`。產生是可重複的：同一份 `build.py` 每次都得到逐位元組相同的檔案。
+3. 把 `build.py` 與 `public/index.html` **一起提交**。Netlify 直接發布 `public/`，不會在雲端執行 `build.py`。
+4. 改版時順手遞增 `build.py` 內的版本字串（console 與頁尾 colophon）以及 `public/sw.js` 的 `V` 快取版本，已安裝的離線用戶端才會更新殼層。
+
+若曾直接改過 `index.html`，請先把改動搬回 `build.py` 再重新產生，否則下次執行 `build.py` 時會被覆蓋。
+
+本機整合測試：`netlify dev`（需 Netlify CLI 與環境變數）。`test-fns.mjs` 為 Functions 的離線單元測試（`node --experimental-strip-types test-fns.mjs`）。

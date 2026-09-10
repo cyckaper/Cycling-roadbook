@@ -1,249 +1,264 @@
-import json, math
+# -*- coding: utf-8 -*-
+"""小布路書 前端產生器 —— python3 build.py → public/index.html
+
+維護方式：
+  * 騎點庫 GAZ、車站 STATIONS、二十四節氣 TERMS、節氣起日 TERM_STARTS 在本檔上方以 Python 資料維護；
+  * 其餘 HTML / CSS / JS 在下方 TEMPLATE（原始字串，內含 /*__GAZ__*/ 等四個佔位符）；
+  * public/index.html 為產生物，請勿直接編輯——改本檔後重新執行 python3 build.py。
+"""
+import json, os
 
 # ================= gazetteer (known Taiwan cycling spots) =================
-# wzone: basin | valley | coast | exposed | lake
+# n: 名稱  a: 別名  lat/lng  elev: 海拔 m  wz: basin | valley | coast | exposed | lake
+# esc: 內建撤退資訊（st 車站／說明、km 距離、hard 是否偏遠）；上線後會被路網矩陣算出的 retreat 取代
 GAZ = [
- {"n":"動物園站","a":["動物園","木柵動物園"],"lat":24.998,"lng":121.579,"elev":30,"wz":"basin",
-  "esc":{"st":"捷運 動物園站","km":0,"hard":False}},
- {"n":"平溪車站","a":["平溪"],"lat":25.025,"lng":121.740,"elev":210,"wz":"valley",
-  "esc":{"st":"平溪線 平溪站","km":0.1,"hard":False}},
- {"n":"嶺腳瀑布","a":["嶺腳"],"lat":25.028,"lng":121.723,"elev":150,"wz":"valley",
-  "esc":{"st":"平溪線 嶺腳站","km":0.3,"hard":False}},
- {"n":"雙溪荷花園","a":["雙溪荷花","荷花園"],"lat":25.033,"lng":121.831,"elev":60,"wz":"valley",
-  "esc":{"st":"宜蘭線 雙溪站","km":1.5,"hard":False}},
- {"n":"雙溪老街","a":["雙溪"],"lat":25.037,"lng":121.866,"elev":40,"wz":"valley",
-  "esc":{"st":"宜蘭線 雙溪站","km":0.4,"hard":False}},
- {"n":"貢寮","a":["貢寮車站"],"lat":25.021,"lng":121.908,"elev":25,"wz":"coast",
-  "esc":{"st":"宜蘭線 貢寮站","km":0.5,"hard":False}},
- {"n":"桃源谷","a":["草嶺線","桃源谷大草原"],"lat":24.997,"lng":121.936,"elev":500,"wz":"exposed",
-  "esc":{"st":"稀少 · 退福隆 ~9km／下切大里古道","km":9,"hard":True}},
- {"n":"福隆車站","a":["福隆"],"lat":25.015,"lng":121.944,"elev":10,"wz":"coast",
-  "esc":{"st":"宜蘭線 福隆站","km":0,"hard":False}},
- {"n":"大稻埕碼頭","a":["大稻埕"],"lat":25.055,"lng":121.510,"elev":6,"wz":"basin",
-  "esc":{"st":"捷運 大橋頭站","km":0.8,"hard":False}},
- {"n":"大佳河濱公園","a":["大佳","大佳河濱"],"lat":25.078,"lng":121.542,"elev":6,"wz":"basin",
-  "esc":{"st":"捷運 劍南路站","km":1.6,"hard":False}},
- {"n":"關渡金色水岸","a":["關渡","關渡水岸"],"lat":25.118,"lng":121.462,"elev":5,"wz":"basin",
-  "esc":{"st":"捷運 關渡站","km":0.7,"hard":False}},
- {"n":"八里左岸","a":["八里"],"lat":25.152,"lng":121.439,"elev":5,"wz":"coast",
-  "esc":{"st":"渡輪轉捷運 淡水站","km":0.5,"hard":False}},
- {"n":"淡水金色水岸","a":["淡水","淡水水岸"],"lat":25.167,"lng":121.438,"elev":4,"wz":"coast",
-  "esc":{"st":"捷運 淡水站","km":0.3,"hard":False}},
- {"n":"新店碧潭","a":["碧潭"],"lat":24.957,"lng":121.537,"elev":15,"wz":"basin",
-  "esc":{"st":"捷運 新店站","km":0.2,"hard":False}},
- {"n":"貓空","a":["貓空纜車"],"lat":24.968,"lng":121.590,"elev":300,"wz":"exposed",
-  "esc":{"st":"貓空纜車 貓空站","km":0.5,"hard":False}},
- {"n":"陽明山","a":["陽明山國家公園","竹子湖"],"lat":25.155,"lng":121.560,"elev":500,"wz":"exposed",
-  "esc":{"st":"僅公車（無鄰近車站）","km":0,"hard":True}},
- {"n":"日月潭環潭","a":["日月潭"],"lat":23.858,"lng":120.915,"elev":748,"wz":"lake",
-  "esc":{"st":"客運 日月潭站（無鐵路）","km":0.5,"hard":True}},
- {"n":"武嶺","a":["合歡山","合歡山主峰"],"lat":24.137,"lng":121.275,"elev":3275,"wz":"exposed",
-  "esc":{"st":"無鄰近轉進點，最近聚落數十公里","km":0,"hard":True}},
- {"n":"西門紅樓","a":["西門","紅樓","西門町"],"lat":25.042,"lng":121.507,"elev":10,"wz":"basin",
-  "esc":{"st":"捷運 西門站","km":0.2,"hard":False}},
- {"n":"圓山飯店","a":["圓山","圓山大飯店"],"lat":25.079,"lng":121.526,"elev":40,"wz":"basin",
-  "esc":{"st":"捷運 圓山站","km":1.0,"hard":False}},
- {"n":"士林官邸","a":["士林官邸公園"],"lat":25.093,"lng":121.531,"elev":15,"wz":"basin",
-  "esc":{"st":"捷運 士林站","km":1.0,"hard":False}},
- {"n":"外雙溪","a":["故宮","故宮博物院","至善路"],"lat":25.102,"lng":121.549,"elev":40,"wz":"valley",
-  "esc":{"st":"捷運 士林站","km":3.0,"hard":False}},
- {"n":"帕米爾公園","a":["帕米爾"],"lat":25.118,"lng":121.531,"elev":250,"wz":"valley",
-  "esc":{"st":"僅公車（無鄰近車站）","km":0,"hard":True}},
- {"n":"風櫃嘴","a":["風櫃嘴亭","五指山"],"lat":25.140,"lng":121.606,"elev":611,"wz":"exposed",
-  "esc":{"st":"僅公車（無鄰近車站）","km":0,"hard":True}},
- {"n":"萬里","a":["萬里區"],"lat":25.181,"lng":121.689,"elev":10,"wz":"coast",
-  "esc":{"st":"無鄰近車站（客運）","km":0,"hard":True}},
- {"n":"基隆","a":["基隆車站","基隆火車站","基隆港"],"lat":25.132,"lng":121.740,"elev":8,"wz":"coast",
-  "esc":{"st":"台鐵 基隆站","km":0.3,"hard":False}},
- {"n":"七星潭","a":["七星潭風景區"],"lat":24.030,"lng":121.625,"elev":6,"wz":"coast",
-  "esc":{"st":"台鐵 北埔站","km":3.5,"hard":False}},
- {"n":"新城老街","a":["新城","新城天主堂"],"lat":24.128,"lng":121.641,"elev":10,"wz":"coast",
-  "esc":{"st":"台鐵 新城站","km":0.4,"hard":False}},
- {"n":"太魯閣","a":["太魯閣牌樓","太魯閣遊客中心","太魯閣國家公園","太魯閣口"],"lat":24.158,"lng":121.622,"elev":60,"wz":"valley",
-  "esc":{"st":"台鐵 新城站","km":3,"hard":False}},
- {"n":"長春祠","a":["長春祠步道"],"lat":24.168,"lng":121.596,"elev":120,"wz":"valley",
-  "esc":{"st":"台鐵 新城站","km":8,"hard":False}},
- {"n":"燕子口","a":["燕子口步道"],"lat":24.174,"lng":121.552,"elev":350,"wz":"exposed",
-  "esc":{"st":"稀少 · 退新城 ~14km","km":14,"hard":True}},
- {"n":"慈母橋","a":["綠水"],"lat":24.176,"lng":121.520,"elev":470,"wz":"exposed",
-  "esc":{"st":"稀少 · 退新城 ~18km","km":18,"hard":True}},
- {"n":"天祥","a":["天祥青年活動中心","天祥晶英","天祥天主堂","祥德寺"],"lat":24.183,"lng":121.492,"elev":480,"wz":"exposed",
-  "esc":{"st":"稀少 · 退新城 ~21km","km":21,"hard":True}},
+ {"n":"動物園站","a":["動物園","木柵動物園"],"lat":24.998,"lng":121.579,"elev":30,"wz":"basin","esc":{"st":"捷運 動物園站","km":0,"hard":False}},
+ {"n":"平溪車站","a":["平溪"],"lat":25.025,"lng":121.74,"elev":210,"wz":"valley","esc":{"st":"平溪線 平溪站","km":0.1,"hard":False}},
+ {"n":"嶺腳瀑布","a":["嶺腳"],"lat":25.0315,"lng":121.7435,"elev":220,"wz":"valley","esc":{"st":"平溪線 嶺腳站","km":0.3,"hard":False}},
+ {"n":"雙溪荷花園","a":["雙溪荷花","荷花園"],"lat":25.033,"lng":121.831,"elev":60,"wz":"valley","esc":{"st":"宜蘭線 雙溪站","km":1.5,"hard":False}},
+ {"n":"雙溪老街","a":["雙溪"],"lat":25.037,"lng":121.866,"elev":40,"wz":"valley","esc":{"st":"宜蘭線 雙溪站","km":0.4,"hard":False}},
+ {"n":"貢寮","a":["貢寮車站"],"lat":25.021,"lng":121.908,"elev":25,"wz":"coast","esc":{"st":"宜蘭線 貢寮站","km":0.5,"hard":False}},
+ {"n":"桃源谷","a":["草嶺線","桃源谷大草原","內寮","蕭家莊","內寮線"],"lat":24.9687,"lng":121.8944,"elev":455,"wz":"exposed","esc":{"st":"稀少 · 原路退貢寮 ~8km","km":8,"hard":True}},
+ {"n":"福隆車站","a":["福隆"],"lat":25.015,"lng":121.944,"elev":10,"wz":"coast","esc":{"st":"宜蘭線 福隆站","km":0,"hard":False}},
+ {"n":"大稻埕碼頭","a":["大稻埕"],"lat":25.055,"lng":121.51,"elev":6,"wz":"basin","esc":{"st":"捷運 大橋頭站","km":0.8,"hard":False}},
+ {"n":"大佳河濱公園","a":["大佳","大佳河濱"],"lat":25.078,"lng":121.542,"elev":6,"wz":"basin","esc":{"st":"捷運 劍南路站","km":1.6,"hard":False}},
+ {"n":"關渡金色水岸","a":["關渡","關渡水岸"],"lat":25.118,"lng":121.462,"elev":5,"wz":"basin","esc":{"st":"捷運 關渡站","km":0.7,"hard":False}},
+ {"n":"八里左岸","a":["八里"],"lat":25.152,"lng":121.439,"elev":5,"wz":"coast","esc":{"st":"渡輪轉捷運 淡水站","km":0.5,"hard":False}},
+ {"n":"淡水金色水岸","a":["淡水","淡水水岸"],"lat":25.167,"lng":121.438,"elev":4,"wz":"coast","esc":{"st":"捷運 淡水站","km":0.3,"hard":False}},
+ {"n":"新店碧潭","a":["碧潭"],"lat":24.957,"lng":121.537,"elev":15,"wz":"basin","esc":{"st":"捷運 新店站","km":0.2,"hard":False}},
+ {"n":"貓空","a":["貓空纜車"],"lat":24.968,"lng":121.59,"elev":300,"wz":"exposed","esc":{"st":"貓空纜車 貓空站","km":0.5,"hard":False}},
+ {"n":"陽明山","a":["陽明山國家公園","竹子湖"],"lat":25.155,"lng":121.56,"elev":500,"wz":"exposed","esc":{"st":"僅公車（無鄰近車站）","km":0,"hard":True}},
+ {"n":"日月潭環潭","a":["日月潭"],"lat":23.858,"lng":120.915,"elev":748,"wz":"lake","esc":{"st":"客運 日月潭站（無鐵路）","km":0.5,"hard":True}},
+ {"n":"武嶺","a":["合歡山","合歡山主峰"],"lat":24.137,"lng":121.275,"elev":3275,"wz":"exposed","esc":{"st":"無鄰近轉進點，最近聚落數十公里","km":0,"hard":True}},
+ {"n":"西門紅樓","a":["西門","紅樓","西門町"],"lat":25.042,"lng":121.507,"elev":10,"wz":"basin","esc":{"st":"捷運 西門站","km":0.2,"hard":False}},
+ {"n":"圓山飯店","a":["圓山","圓山大飯店"],"lat":25.079,"lng":121.526,"elev":40,"wz":"basin","esc":{"st":"捷運 圓山站","km":1.0,"hard":False}},
+ {"n":"士林官邸","a":["士林官邸公園"],"lat":25.093,"lng":121.531,"elev":15,"wz":"basin","esc":{"st":"捷運 士林站","km":1.0,"hard":False}},
+ {"n":"外雙溪","a":["故宮","故宮博物院","至善路"],"lat":25.102,"lng":121.549,"elev":40,"wz":"valley","esc":{"st":"捷運 士林站","km":3.0,"hard":False}},
+ {"n":"帕米爾公園","a":["帕米爾"],"lat":25.118,"lng":121.531,"elev":250,"wz":"valley","esc":{"st":"僅公車（無鄰近車站）","km":0,"hard":True}},
+ {"n":"風櫃嘴","a":["風櫃嘴亭","五指山"],"lat":25.14,"lng":121.606,"elev":611,"wz":"exposed","esc":{"st":"僅公車（無鄰近車站）","km":0,"hard":True}},
+ {"n":"萬里","a":["萬里區"],"lat":25.181,"lng":121.689,"elev":10,"wz":"coast","esc":{"st":"無鄰近車站（客運）","km":0,"hard":True}},
+ {"n":"基隆","a":["基隆車站","基隆火車站","基隆港"],"lat":25.132,"lng":121.74,"elev":8,"wz":"coast","esc":{"st":"台鐵 基隆站","km":0.3,"hard":False}},
+ {"n":"七星潭","a":["七星潭風景區"],"lat":24.03,"lng":121.625,"elev":6,"wz":"coast","esc":{"st":"台鐵 北埔站","km":3.5,"hard":False}},
+ {"n":"新城老街","a":["新城","新城天主堂"],"lat":24.128,"lng":121.641,"elev":10,"wz":"coast","esc":{"st":"台鐵 新城站","km":0.4,"hard":False}},
+ {"n":"太魯閣","a":["太魯閣牌樓","太魯閣遊客中心","太魯閣國家公園","太魯閣口"],"lat":24.158,"lng":121.622,"elev":60,"wz":"valley","esc":{"st":"台鐵 新城站","km":3,"hard":False}},
+ {"n":"長春祠","a":["長春祠步道"],"lat":24.168,"lng":121.596,"elev":120,"wz":"valley","esc":{"st":"台鐵 新城站","km":8,"hard":False}},
+ {"n":"燕子口","a":["燕子口步道"],"lat":24.174,"lng":121.552,"elev":350,"wz":"exposed","esc":{"st":"稀少 · 退新城 ~14km","km":14,"hard":True}},
+ {"n":"慈母橋","a":["綠水"],"lat":24.176,"lng":121.52,"elev":470,"wz":"exposed","esc":{"st":"稀少 · 退新城 ~18km","km":18,"hard":True}},
+ {"n":"天祥","a":["天祥青年活動中心","天祥晶英","天祥天主堂","祥德寺"],"lat":24.183,"lng":121.492,"elev":480,"wz":"exposed","esc":{"st":"稀少 · 退新城 ~21km","km":21,"hard":True}},
+ {"n":"竹圍漁港","a":["桃園竹圍漁港","大園竹圍漁港"],"lat":25.116,"lng":121.2395,"elev":5,"wz":"coast","esc":{"st":"機捷 A15 大園站","km":6.5,"hard":False}},
+ {"n":"許厝港濕地","a":["許厝港","許厝濕地","許厝港國家重要濕地"],"lat":25.094,"lng":121.219,"elev":5,"wz":"coast","esc":{"st":"機捷 A15 大園站","km":5.5,"hard":False}},
+ {"n":"草漯沙丘","a":["草漯","草漯沙丘地質公園"],"lat":25.049,"lng":121.1215,"elev":15,"wz":"coast","esc":{"st":"機捷 A15 大園站","km":9.5,"hard":True}},
+ {"n":"觀音海水浴場","a":["觀音浴場","觀音海水浴"],"lat":25.035,"lng":121.087,"elev":5,"wz":"coast","esc":{"st":"台鐵 中壢站","km":16,"hard":True}},
+ {"n":"白沙岬燈塔","a":["白沙岬","觀音燈塔"],"lat":25.0325,"lng":121.0862,"elev":10,"wz":"coast","esc":{"st":"台鐵 中壢站","km":16,"hard":True}},
+ {"n":"永安漁港","a":["永安","新屋永安漁港"],"lat":24.985,"lng":121.0,"elev":5,"wz":"coast","esc":{"st":"台鐵 富岡站","km":10,"hard":True}},
+ {"n":"新屋綠色隧道","a":["綠色隧道","新屋綠隧"],"lat":24.966,"lng":121.027,"elev":10,"wz":"coast","esc":{"st":"台鐵 富岡站","km":8,"hard":True}},
+ {"n":"富岡老街","a":["富岡"],"lat":24.937,"lng":121.079,"elev":80,"wz":"basin","esc":{"st":"台鐵 富岡站","km":0.3,"hard":False}},
 ]
 
-# ================= station list: major TRA + Taipei/New Taipei Metro =================
-# [name, lat, lng, system]   (coords approximate — for nearest-station selection)
+# ================= rail / metro stations: [名稱, lat, lng, 系統] =================
+# 內建約 157 站；部署 TDX_CLIENT_ID/SECRET 後 /api/stations 會再補齊全台車站
 STATIONS = [
- # 台鐵 縱貫線北段 + 主要西/南站
- ["基隆",25.131,121.740,"台鐵"],["七堵",25.096,121.713,"台鐵"],["汐止",25.069,121.662,"台鐵"],
- ["南港",25.053,121.607,"台鐵"],["松山",25.049,121.577,"台鐵"],["臺北",25.048,121.517,"台鐵"],
- ["萬華",25.033,121.500,"台鐵"],["板橋",25.014,121.464,"台鐵"],["樹林",24.991,121.426,"台鐵"],
- ["鶯歌",24.954,121.354,"台鐵"],["桃園",24.989,121.314,"台鐵"],["中壢",24.954,121.225,"台鐵"],
- ["新竹",24.802,120.972,"台鐵"],["竹南",24.686,120.873,"台鐵"],["苗栗",24.569,120.826,"台鐵"],
- ["臺中",24.137,120.686,"台鐵"],["彰化",24.082,120.538,"台鐵"],["員林",23.959,120.571,"台鐵"],
- ["斗六",23.712,120.535,"台鐵"],["嘉義",23.479,120.442,"台鐵"],["臺南",22.997,120.212,"台鐵"],
- ["高雄",22.639,120.302,"台鐵"],["屏東",22.671,120.488,"台鐵"],["潮州",22.550,120.543,"台鐵"],
- # 台鐵 宜蘭線 / 北迴線 / 花東線
- ["八堵",25.109,121.723,"台鐵"],["瑞芳",25.108,121.806,"台鐵"],["猴硐",25.087,121.828,"台鐵"],
- ["三貂嶺",25.061,121.824,"台鐵"],["牡丹",25.038,121.849,"台鐵"],["雙溪",25.037,121.866,"台鐵"],
- ["貢寮",25.021,121.908,"台鐵"],["福隆",25.015,121.944,"台鐵"],["石城",24.983,121.941,"台鐵"],
- ["大里",24.968,121.918,"台鐵"],["頭城",24.859,121.823,"台鐵"],["礁溪",24.827,121.774,"台鐵"],
- ["宜蘭",24.752,121.751,"台鐵"],["羅東",24.677,121.766,"台鐵"],["冬山",24.635,121.792,"台鐵"],
- ["蘇澳新",24.599,121.833,"台鐵"],["蘇澳",24.594,121.848,"台鐵"],["東澳",24.499,121.831,"台鐵"],
- ["南澳",24.464,121.800,"台鐵"],["和平",24.309,121.755,"台鐵"],["崇德",24.212,121.643,"台鐵"],
- ["新城",24.128,121.641,"台鐵"],["花蓮",23.993,121.601,"台鐵"],["吉安",23.966,121.578,"台鐵"],
- ["志學",23.923,121.545,"台鐵"],["壽豐",23.868,121.508,"台鐵"],["鳳林",23.745,121.451,"台鐵"],
- ["光復",23.669,121.421,"台鐵"],["瑞穗",23.497,121.377,"台鐵"],["玉里",23.337,121.315,"台鐵"],
- ["富里",23.180,121.245,"台鐵"],["池上",23.122,121.215,"台鐵"],["關山",23.049,121.161,"台鐵"],
- ["鹿野",22.921,121.135,"台鐵"],["臺東",22.793,121.130,"台鐵"],
- # 台鐵 平溪 / 深澳 / 集集 支線
- ["海科館",25.135,121.803,"台鐵"],["八斗子",25.139,121.803,"台鐵"],["大華",25.045,121.808,"台鐵"],
- ["十分",25.043,121.775,"台鐵"],["望古",25.036,121.760,"台鐵"],["嶺腳",25.028,121.742,"台鐵"],
- ["平溪",25.025,121.740,"台鐵"],["菁桐",25.023,121.726,"台鐵"],
- ["二水",23.809,120.617,"台鐵"],["集集",23.828,120.785,"台鐵"],["車埕",23.836,120.855,"台鐵"],
- # 捷運 淡水信義線
- ["淡水",25.168,121.446,"捷運"],["紅樹林",25.155,121.459,"捷運"],["竹圍",25.137,121.460,"捷運"],
- ["關渡",25.126,121.467,"捷運"],["北投",25.131,121.499,"捷運"],["新北投",25.137,121.503,"捷運"],
- ["石牌",25.114,121.515,"捷運"],["士林",25.094,121.526,"捷運"],["劍潭",25.084,121.525,"捷運"],
- ["圓山",25.071,121.520,"捷運"],["民權西路",25.063,121.519,"捷運"],["中山",25.053,121.520,"捷運"],
- ["台北車站",25.048,121.517,"捷運"],["中正紀念堂",25.033,121.518,"捷運"],["東門",25.034,121.529,"捷運"],
- ["大安",25.033,121.543,"捷運"],["信義安和",25.033,121.552,"捷運"],["台北101",25.033,121.563,"捷運"],
- ["象山",25.032,121.570,"捷運"],
- # 捷運 松山新店線
- ["古亭",25.026,121.523,"捷運"],["台電大樓",25.021,121.528,"捷運"],["公館",25.015,121.534,"捷運"],
- ["景美",24.993,121.541,"捷運"],["大坪林",24.983,121.541,"捷運"],["七張",24.977,121.542,"捷運"],
- ["新店區公所",24.968,121.537,"捷運"],["新店",24.958,121.537,"捷運"],["西門",25.042,121.508,"捷運"],
- ["松江南京",25.052,121.533,"捷運"],["南京復興",25.052,121.544,"捷運"],["台北小巨蛋",25.052,121.551,"捷運"],
- ["南京三民",25.052,121.560,"捷運"],["松山",25.050,121.578,"捷運"],
- # 捷運 板南線
- ["龍山寺",25.035,121.500,"捷運"],["江子翠",25.030,121.474,"捷運"],["新埔",25.023,121.468,"捷運"],
- ["板橋",25.014,121.462,"捷運"],["府中",25.008,121.459,"捷運"],["亞東醫院",24.998,121.452,"捷運"],
- ["土城",24.973,121.444,"捷運"],["永寧",24.967,121.436,"捷運"],["頂埔",24.960,121.420,"捷運"],
- ["忠孝新生",25.042,121.533,"捷運"],["忠孝復興",25.042,121.544,"捷運"],["忠孝敦化",25.042,121.551,"捷運"],
- ["國父紀念館",25.041,121.557,"捷運"],["市政府",25.041,121.565,"捷運"],["永春",25.041,121.576,"捷運"],
- ["後山埤",25.045,121.582,"捷運"],["昆陽",25.051,121.593,"捷運"],["南港展覽館",25.055,121.618,"捷運"],
- # 捷運 文湖線
- ["動物園",24.998,121.579,"捷運"],["木柵",24.998,121.573,"捷運"],["萬芳社區",24.999,121.568,"捷運"],
- ["六張犁",25.024,121.553,"捷運"],["科技大樓",25.026,121.543,"捷運"],["中山國中",25.061,121.544,"捷運"],
- ["松山機場",25.062,121.552,"捷運"],["大直",25.079,121.547,"捷運"],["劍南路",25.084,121.556,"捷運"],
- ["西湖",25.082,121.567,"捷運"],["內湖",25.084,121.594,"捷運"],
- # 捷運 中和新蘆線
- ["行天宮",25.062,121.533,"捷運"],["中山國小",25.063,121.526,"捷運"],["大橋頭",25.063,121.512,"捷運"],
- ["三重國小",25.070,121.496,"捷運"],["菜寮",25.061,121.489,"捷運"],["頭前庄",25.049,121.460,"捷運"],
- ["新莊",25.037,121.451,"捷運"],["輔大",25.032,121.433,"捷運"],["迴龍",25.028,121.418,"捷運"],
- ["三民高中",25.079,121.484,"捷運"],["蘆洲",25.085,121.472,"捷運"],["頂溪",25.012,121.515,"捷運"],
- ["永安市場",24.994,121.512,"捷運"],["景安",24.994,121.505,"捷運"],["南勢角",24.986,121.507,"捷運"],
- # 捷運 環狀線
- ["新北產業園區",25.062,121.459,"捷運"],["板新",25.021,121.469,"捷運"],["中和",25.001,121.480,"捷運"],
- ["景平",24.992,121.510,"捷運"],["十四張",24.987,121.532,"捷運"],
+ ["基隆",25.131,121.74,"台鐵"],
+ ["七堵",25.096,121.713,"台鐵"],
+ ["汐止",25.069,121.662,"台鐵"],
+ ["南港",25.053,121.607,"台鐵"],
+ ["松山",25.049,121.577,"台鐵"],
+ ["臺北",25.048,121.517,"台鐵"],
+ ["萬華",25.033,121.5,"台鐵"],
+ ["板橋",25.014,121.464,"台鐵"],
+ ["樹林",24.991,121.426,"台鐵"],
+ ["鶯歌",24.954,121.354,"台鐵"],
+ ["桃園",24.989,121.314,"台鐵"],
+ ["中壢",24.954,121.225,"台鐵"],
+ ["埔心",24.919,121.182,"台鐵"],
+ ["楊梅",24.914,121.146,"台鐵"],
+ ["富岡",24.937,121.079,"台鐵"],
+ ["北湖",24.95,121.061,"台鐵"],
+ ["湖口",24.904,121.044,"台鐵"],
+ ["新竹",24.802,120.972,"台鐵"],
+ ["竹南",24.686,120.873,"台鐵"],
+ ["苗栗",24.569,120.826,"台鐵"],
+ ["臺中",24.137,120.686,"台鐵"],
+ ["彰化",24.082,120.538,"台鐵"],
+ ["員林",23.959,120.571,"台鐵"],
+ ["斗六",23.712,120.535,"台鐵"],
+ ["嘉義",23.479,120.442,"台鐵"],
+ ["臺南",22.997,120.212,"台鐵"],
+ ["高雄",22.639,120.302,"台鐵"],
+ ["屏東",22.671,120.488,"台鐵"],
+ ["潮州",22.55,120.543,"台鐵"],
+ ["八堵",25.109,121.723,"台鐵"],
+ ["瑞芳",25.108,121.806,"台鐵"],
+ ["猴硐",25.087,121.828,"台鐵"],
+ ["三貂嶺",25.061,121.824,"台鐵"],
+ ["牡丹",25.038,121.849,"台鐵"],
+ ["雙溪",25.037,121.866,"台鐵"],
+ ["貢寮",25.021,121.908,"台鐵"],
+ ["福隆",25.015,121.944,"台鐵"],
+ ["石城",24.983,121.941,"台鐵"],
+ ["大里",24.968,121.918,"台鐵"],
+ ["頭城",24.859,121.823,"台鐵"],
+ ["礁溪",24.827,121.774,"台鐵"],
+ ["宜蘭",24.752,121.751,"台鐵"],
+ ["羅東",24.677,121.766,"台鐵"],
+ ["冬山",24.635,121.792,"台鐵"],
+ ["蘇澳新",24.599,121.833,"台鐵"],
+ ["蘇澳",24.594,121.848,"台鐵"],
+ ["東澳",24.499,121.831,"台鐵"],
+ ["南澳",24.464,121.8,"台鐵"],
+ ["和平",24.309,121.755,"台鐵"],
+ ["崇德",24.212,121.643,"台鐵"],
+ ["新城",24.128,121.641,"台鐵"],
+ ["花蓮",23.993,121.601,"台鐵"],
+ ["吉安",23.966,121.578,"台鐵"],
+ ["志學",23.923,121.545,"台鐵"],
+ ["壽豐",23.868,121.508,"台鐵"],
+ ["鳳林",23.745,121.451,"台鐵"],
+ ["光復",23.669,121.421,"台鐵"],
+ ["瑞穗",23.497,121.377,"台鐵"],
+ ["玉里",23.337,121.315,"台鐵"],
+ ["富里",23.18,121.245,"台鐵"],
+ ["池上",23.122,121.215,"台鐵"],
+ ["關山",23.049,121.161,"台鐵"],
+ ["鹿野",22.921,121.135,"台鐵"],
+ ["臺東",22.793,121.13,"台鐵"],
+ ["海科館",25.135,121.803,"台鐵"],
+ ["八斗子",25.139,121.803,"台鐵"],
+ ["大華",25.045,121.808,"台鐵"],
+ ["十分",25.043,121.775,"台鐵"],
+ ["望古",25.036,121.76,"台鐵"],
+ ["嶺腳",25.028,121.742,"台鐵"],
+ ["平溪",25.025,121.74,"台鐵"],
+ ["菁桐",25.023,121.726,"台鐵"],
+ ["二水",23.809,120.617,"台鐵"],
+ ["集集",23.828,120.785,"台鐵"],
+ ["車埕",23.836,120.855,"台鐵"],
+ ["淡水",25.168,121.446,"捷運"],
+ ["紅樹林",25.155,121.459,"捷運"],
+ ["竹圍",25.137,121.46,"捷運"],
+ ["關渡",25.126,121.467,"捷運"],
+ ["北投",25.131,121.499,"捷運"],
+ ["新北投",25.137,121.503,"捷運"],
+ ["石牌",25.114,121.515,"捷運"],
+ ["士林",25.094,121.526,"捷運"],
+ ["劍潭",25.084,121.525,"捷運"],
+ ["圓山",25.071,121.52,"捷運"],
+ ["民權西路",25.063,121.519,"捷運"],
+ ["中山",25.053,121.52,"捷運"],
+ ["台北車站",25.048,121.517,"捷運"],
+ ["中正紀念堂",25.033,121.518,"捷運"],
+ ["東門",25.034,121.529,"捷運"],
+ ["大安",25.033,121.543,"捷運"],
+ ["信義安和",25.033,121.552,"捷運"],
+ ["台北101",25.033,121.563,"捷運"],
+ ["象山",25.032,121.57,"捷運"],
+ ["古亭",25.026,121.523,"捷運"],
+ ["台電大樓",25.021,121.528,"捷運"],
+ ["公館",25.015,121.534,"捷運"],
+ ["景美",24.993,121.541,"捷運"],
+ ["大坪林",24.983,121.541,"捷運"],
+ ["七張",24.977,121.542,"捷運"],
+ ["新店區公所",24.968,121.537,"捷運"],
+ ["新店",24.958,121.537,"捷運"],
+ ["西門",25.042,121.508,"捷運"],
+ ["松江南京",25.052,121.533,"捷運"],
+ ["南京復興",25.052,121.544,"捷運"],
+ ["台北小巨蛋",25.052,121.551,"捷運"],
+ ["南京三民",25.052,121.56,"捷運"],
+ ["松山",25.05,121.578,"捷運"],
+ ["龍山寺",25.035,121.5,"捷運"],
+ ["江子翠",25.03,121.474,"捷運"],
+ ["新埔",25.023,121.468,"捷運"],
+ ["板橋",25.014,121.462,"捷運"],
+ ["府中",25.008,121.459,"捷運"],
+ ["亞東醫院",24.998,121.452,"捷運"],
+ ["土城",24.973,121.444,"捷運"],
+ ["永寧",24.967,121.436,"捷運"],
+ ["頂埔",24.96,121.42,"捷運"],
+ ["忠孝新生",25.042,121.533,"捷運"],
+ ["忠孝復興",25.042,121.544,"捷運"],
+ ["忠孝敦化",25.042,121.551,"捷運"],
+ ["國父紀念館",25.041,121.557,"捷運"],
+ ["市政府",25.041,121.565,"捷運"],
+ ["永春",25.041,121.576,"捷運"],
+ ["後山埤",25.045,121.582,"捷運"],
+ ["昆陽",25.051,121.593,"捷運"],
+ ["南港展覽館",25.055,121.618,"捷運"],
+ ["動物園",24.998,121.579,"捷運"],
+ ["木柵",24.998,121.573,"捷運"],
+ ["萬芳社區",24.999,121.568,"捷運"],
+ ["六張犁",25.024,121.553,"捷運"],
+ ["科技大樓",25.026,121.543,"捷運"],
+ ["中山國中",25.061,121.544,"捷運"],
+ ["松山機場",25.062,121.552,"捷運"],
+ ["大直",25.079,121.547,"捷運"],
+ ["劍南路",25.084,121.556,"捷運"],
+ ["西湖",25.082,121.567,"捷運"],
+ ["內湖",25.084,121.594,"捷運"],
+ ["行天宮",25.062,121.533,"捷運"],
+ ["中山國小",25.063,121.526,"捷運"],
+ ["大橋頭",25.063,121.512,"捷運"],
+ ["三重國小",25.07,121.496,"捷運"],
+ ["菜寮",25.061,121.489,"捷運"],
+ ["頭前庄",25.049,121.46,"捷運"],
+ ["新莊",25.037,121.451,"捷運"],
+ ["輔大",25.032,121.433,"捷運"],
+ ["迴龍",25.028,121.418,"捷運"],
+ ["三民高中",25.079,121.484,"捷運"],
+ ["蘆洲",25.085,121.472,"捷運"],
+ ["頂溪",25.012,121.515,"捷運"],
+ ["永安市場",24.994,121.512,"捷運"],
+ ["景安",24.994,121.505,"捷運"],
+ ["南勢角",24.986,121.507,"捷運"],
+ ["新北產業園區",25.062,121.459,"捷運"],
+ ["板新",25.021,121.469,"捷運"],
+ ["中和",25.001,121.48,"捷運"],
+ ["景平",24.992,121.51,"捷運"],
+ ["十四張",24.987,121.532,"捷運"],
 ]
 
-
-T = [
-("立春","2 / 4","春寒料峭，河風仍利，萬物將動。",["短程暖身","河濱緩騎"],["逞強遠征"],"午後微陽","輪未轉熱，先養腿力。","spring"),
-("雨水","2 / 19","細雨綿綿，路面常濕，木棉始綻街角。",["雨歇即出","市區慢遊"],["雨中急煞","下坡逞快"],"雨停初晴","濕路如薄冰，寧緩勿急。","spring"),
-("驚蟄","3 / 5","春雷乍響，蟄蟲始振，苦楝冒紫。",["解凍遠騎","訪春之庭園"],["晨出未暖身"],"午後","身已解凍，心也該出門。","spring"),
-("春分","3 / 20","晝夜均分，風溫日暖。",["全日長程","結伴同行"],["此格無忌"],"整日","晝夜各半，正好把路騎成一條中庸。","spring"),
-("清明","4 / 4","天清氣明，梅雨未至，一年最穩。",["多日縱走","訪古道兼掃墓"],["辜負這片晴好"],"整日","此時不縱走，更待何時。","spring"),
-("穀雨","4 / 20","雨生百穀，油桐落如五月雪。",["山區賞桐","雨前搶騎"],["輕忽午後雷陣"],"上午","把握梅雨前最後的乾爽。","spring"),
-("立夏","5 / 5","暑氣初起，入梅在即。",["清晨出行","隨身備雨"],["正午曝騎"],"破曉","夏門已開，與雨賽跑的季節到了。","summer"),
-("小滿","5 / 21","梅雨綿延，溪水漸漲。",["雨窗短騎","河濱看水"],["低地溪畔","雷雨將至"],"雨歇之間","水未滿則騎，水將滿則歸。","summer"),
-("芒種","6 / 6","鳳凰始燃於路口，梅雨將盡。",["晨昏兩頭騎","賞鳳凰木"],["正午堤頂"],"清晨與黃昏","日頭毒了，騎乘往兩頭退。","summer"),
-("夏至","6 / 21","白晝最長，暑氣方盛。",["極早出行","善用長日"],["午後曝曬"],"天未亮","日最長，影最短，人要躲著太陽走。","summer"),
-("小暑","7 / 7","颱風季啟，溽暑悶熱。",["盯緊颱風","把握晴窗"],["風雨將至仍出"],"清晨","看天色，更要看氣象。","summer"),
-("大暑","7 / 22","一年最熱，平地如灶。",["破曉出門","上山避暑（武嶺、中橫）"],["平地正午"],"日出前","平地如灶，把車騎上山去。","summer"),
-("立秋","8 / 7","暑未消，颱風正盛。",["颱風空檔","傍晚乘涼"],["颱前颱後近溪"],"傍晚","秋字雖立，暑與颱猶在。","autumn"),
-("處暑","8 / 23","暑氣將止，晚風初涼。",["黃昏騎乘","河濱納涼"],["輕信秋涼而曝曬"],"日落前後","暑氣退場，涼意排隊進來。","autumn"),
-("白露","9 / 7","河面始霧，呼吸見白。",["晨霧河濱","添薄長袖"],["薄衫貪涼"],"清晨","露白了，該為手臂添一層。","autumn"),
-("秋分","9 / 23","晝夜再均，季風前的黃金窗。",["長程縱走","結伴遠行"],["錯過這片清朗"],"整日","風起之前，把遠路騎個夠。","autumn"),
-("寒露","10 / 8","東北季風初臨，轉涼起風。",["背風路線","向陽而行"],["迎風硬騎"],"午後向陽","風從東北來，路就往背風選。","autumn"),
-("霜降","10 / 23","北風漸勁，氣溫下探。",["正午暖時","添件風衣"],["清晨迎風"],"正午","風利了，挑暖的時辰騎。","autumn"),
-("立冬","11 / 7","季風穩定，台北濕冷。",["晴日把握","保暖層疊"],["濕冷迎風遠征"],"正午晴時","冬門已掩，騎乘趁晴。","winter"),
-("小雪","11 / 22","北地飄雪，在台只是濕涼。",["向陽河段","短程暖身"],["陰雨迎風"],"午後","此地無雪，只有濕與風。","winter"),
-("大雪","12 / 7","名為大雪，在台不過冬雨。",["晴窗短騎","溫熱收尾"],["貪遠受寒"],"正午","名與實之間，正是台灣的趣味。","winter"),
-("冬至","12 / 22","白晝最短，與光賽跑。",["短程早歸","湯圓暖身"],["摸黑遠歸"],"正午前後","日最短，早歸早暖。","winter"),
-("小寒","1 / 5","漸入嚴寒（台灣式）。",["南向追陽","台東暖騎"],["寒流迎風"],"正午","北邊冷了，車頭就往南偏。","winter"),
-("大寒","1 / 20","一年最冷，然台灣猶可騎。",["南部逐暖","台東追陽"],["寒流高地"],"正午","最冷一格，也是輪將轉回春天的前夜。","winter"),
+# ================= 二十四節氣：name / yi 宜 / ji 忌 / verse / season =================
+# 英、日文版本在 TEMPLATE 內的 TERMS_L
+TERMS = [
+ {"name":"立春","yi":["短程暖身","河濱緩騎"],"ji":["逞強遠征"],"verse":"輪未轉熱，先養腿力。","season":"spring"},
+ {"name":"雨水","yi":["雨歇即出","市區慢遊"],"ji":["雨中急煞","下坡逞快"],"verse":"濕路如薄冰，寧緩勿急。","season":"spring"},
+ {"name":"驚蟄","yi":["解凍遠騎","訪春之庭園"],"ji":["晨出未暖身"],"verse":"身已解凍，心也該出門。","season":"spring"},
+ {"name":"春分","yi":["全日長程","結伴同行"],"ji":["此格無忌"],"verse":"晝夜各半，正好把路騎成一條中庸。","season":"spring"},
+ {"name":"清明","yi":["多日縱走","訪古道兼掃墓"],"ji":["辜負這片晴好"],"verse":"此時不縱走，更待何時。","season":"spring"},
+ {"name":"穀雨","yi":["山區賞桐","雨前搶騎"],"ji":["輕忽午後雷陣"],"verse":"把握梅雨前最後的乾爽。","season":"spring"},
+ {"name":"立夏","yi":["清晨出行","隨身備雨"],"ji":["正午曝騎"],"verse":"夏門已開，與雨賽跑的季節到了。","season":"summer"},
+ {"name":"小滿","yi":["雨窗短騎","河濱看水"],"ji":["低地溪畔","雷雨將至"],"verse":"水未滿則騎，水將滿則歸。","season":"summer"},
+ {"name":"芒種","yi":["晨昏兩頭騎","賞鳳凰木"],"ji":["正午堤頂"],"verse":"日頭毒了，騎乘往兩頭退。","season":"summer"},
+ {"name":"夏至","yi":["極早出行","善用長日"],"ji":["午後曝曬"],"verse":"日最長，影最短，人要躲著太陽走。","season":"summer"},
+ {"name":"小暑","yi":["盯緊颱風","把握晴窗"],"ji":["風雨將至仍出"],"verse":"看天色，更要看氣象。","season":"summer"},
+ {"name":"大暑","yi":["破曉出門","上山避暑（武嶺、中橫）"],"ji":["平地正午"],"verse":"平地如灶，把車騎上山去。","season":"summer"},
+ {"name":"立秋","yi":["颱風空檔","傍晚乘涼"],"ji":["颱前颱後近溪"],"verse":"秋字雖立，暑與颱猶在。","season":"autumn"},
+ {"name":"處暑","yi":["黃昏騎乘","河濱納涼"],"ji":["輕信秋涼而曝曬"],"verse":"暑氣退場，涼意排隊進來。","season":"autumn"},
+ {"name":"白露","yi":["晨霧河濱","添薄長袖"],"ji":["薄衫貪涼"],"verse":"露白了，該為手臂添一層。","season":"autumn"},
+ {"name":"秋分","yi":["長程縱走","結伴遠行"],"ji":["錯過這片清朗"],"verse":"風起之前，把遠路騎個夠。","season":"autumn"},
+ {"name":"寒露","yi":["背風路線","向陽而行"],"ji":["迎風硬騎"],"verse":"風從東北來，路就往背風選。","season":"autumn"},
+ {"name":"霜降","yi":["正午暖時","添件風衣"],"ji":["清晨迎風"],"verse":"風利了，挑暖的時辰騎。","season":"autumn"},
+ {"name":"立冬","yi":["晴日把握","保暖層疊"],"ji":["濕冷迎風遠征"],"verse":"冬門已掩，騎乘趁晴。","season":"winter"},
+ {"name":"小雪","yi":["向陽河段","短程暖身"],"ji":["陰雨迎風"],"verse":"此地無雪，只有濕與風。","season":"winter"},
+ {"name":"大雪","yi":["晴窗短騎","溫熱收尾"],"ji":["貪遠受寒"],"verse":"名與實之間，正是台灣的趣味。","season":"winter"},
+ {"name":"冬至","yi":["短程早歸","湯圓暖身"],"ji":["摸黑遠歸"],"verse":"日最短，早歸早暖。","season":"winter"},
+ {"name":"小寒","yi":["南向追陽","台東暖騎"],"ji":["寒流迎風"],"verse":"北邊冷了，車頭就往南偏。","season":"winter"},
+ {"name":"大寒","yi":["南部逐暖","台東追陽"],"ji":["寒流高地"],"verse":"最冷一格，也是輪將轉回春天的前夜。","season":"winter"},
 ]
-SEASON = {"spring":("春","Spring","#5FA046"),"summer":("夏","Summer","#CE8418"),
-          "autumn":("秋","Autumn","#BE5027"),"winter":("冬","Winter","#34877C")}
+
 # term start [month, day] for "today" detection (JS uses these)
-TERM_STARTS = [[2,4],[2,19],[3,5],[3,20],[4,4],[4,20],[5,5],[5,21],[6,6],[6,21],[7,7],[7,22],
- [8,7],[8,23],[9,7],[9,23],[10,8],[10,23],[11,7],[11,22],[12,7],[12,22],[1,5],[1,20]]
+TERM_STARTS = [[2, 4], [2, 19], [3, 5], [3, 20], [4, 4], [4, 20], [5, 5], [5, 21], [6, 6], [6, 21], [7, 7], [7, 22], [8, 7], [8, 23], [9, 7], [9, 23], [10, 8], [10, 23], [11, 7], [11, 22], [12, 7], [12, 22], [1, 5], [1, 20]]
 
-# ================= build wheel SVG =================
-cx,cy=240,240; r_label=222; r_rim_out=198; r_rim_in=183; r_spoke_out=181; r_hub=47
-def pol(r,deg):
-    a=math.radians(deg); return cx+r*math.cos(a), cy+r*math.sin(a)
-def arc_path(r,a0,a1):
-    x0,y0=pol(r,a0); x1,y1=pol(r,a1); large=1 if (a1-a0)%360>180 else 0
-    return f"M {x0:.2f} {y0:.2f} A {r} {r} 0 {large} 1 {x1:.2f} {y1:.2f}"
-sv=[f'<svg class="wheel" viewBox="0 0 480 480" role="img" aria-label="二十四節氣車輪">']
-sv.append(f'<circle cx="{cx}" cy="{cy}" r="{r_rim_out+6}" fill="none" stroke="#2A2622" stroke-width="2" opacity="0.18"/>')
-order=["spring","summer","autumn","winter"]
-for si,sk in enumerate(order):
-    a0=-90+si*90-7.5; a1=a0+90
-    sv.append(f'<path d="{arc_path((r_rim_out+r_rim_in)/2,a0,a1)}" fill="none" stroke="{SEASON[sk][2]}" stroke-width="{r_rim_out-r_rim_in}" opacity="0.95"/>')
-for si,sk in enumerate(order):
-    am=-90+si*90+37.5; wx_,wy_=pol(118,am)
-    sv.append(f'<text x="{wx_:.1f}" y="{wy_:.1f}" class="wmk" fill="{SEASON[sk][2]}" text-anchor="middle" dominant-baseline="central">{SEASON[sk][0]}</text>')
-for i,row in enumerate(T):
-    sk=row[7]; col=SEASON[sk][2]; deg=-90+i*15
-    x1,y1=pol(r_hub+3,deg); x2,y2=pol(r_spoke_out,deg)
-    sv.append(f'<line id="wsp-{i}" x1="{x1:.2f}" y1="{y1:.2f}" x2="{x2:.2f}" y2="{y2:.2f}" stroke="{col}" stroke-width="1.2" opacity="0.62"/>')
-    dx,dy=pol(r_rim_in-2,deg); sv.append(f'<circle cx="{dx:.2f}" cy="{dy:.2f}" r="2.6" fill="{col}"/>')
-    lx,ly=pol(r_label,deg)
-    sv.append(f'<text id="wlbl-{i}" data-x="{lx:.2f}" data-y="{ly:.2f}" x="{lx:.2f}" y="{ly:.2f}" class="wlbl" text-anchor="middle" dominant-baseline="central">{row[0]}</text>')
-sv.append(f'<circle cx="{cx}" cy="{cy}" r="{r_hub}" fill="#FBF8F0" stroke="#BE3D24" stroke-width="2.5"/>')
-sv.append(f'<circle cx="{cx}" cy="{cy}" r="{r_hub-8}" fill="none" stroke="#BE3D24" stroke-width="1" opacity="0.4"/>')
-sv.append(f'<text x="{cx}" y="{cy-12}" class="hubsm" text-anchor="middle" dominant-baseline="central">出發 ⟳ 歸來</text>')
-sv.append(f'<text x="{cx}" y="{cy+10}" class="hubbig" text-anchor="middle" dominant-baseline="central">家</text>')
-sv.append('</svg>')
-WHEEL="\n".join(sv)
-
-# ================= build almanac cards =================
-def cards_for(sk):
-    out=[]
-    for idx,row in enumerate(T):
-        if row[7]!=sk: continue
-        name,date,scene,yi,ji,hour,verse,_=row
-        out.append(f'''        <article class="term" id="term-{idx}">
-          <div class="term__head"><span class="term__name">{name}</span><span class="term__date">{date}</span></div>
-          <p class="term__scene">{scene}</p>
-          <div class="yiji">
-            <div class="row row--yi"><span class="seal seal--yi">宜</span><span class="row__txt">{" · ".join(yi)}</span></div>
-            <div class="row row--ji"><span class="seal seal--ji">忌</span><span class="row__txt">{" · ".join(ji)}</span></div>
-          </div>
-          <p class="term__hour"><span class="hour__k">吉時</span>{hour}</p>
-          <p class="term__verse">{verse}</p>
-        </article>''')
-    return "\n".join(out)
-ICON = {
- "spring":'<svg class="season__ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22V10"/><path d="M12 12C12 8.5 9 6 5.5 6.5 5.1 10 7.5 12.4 12 12"/><path d="M12 14c0-2.8 2.4-5 5.5-4.5.3 2.9-2 5-5.5 4.5"/></svg>',
- "summer":'<svg class="season__ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="4.3"/><path d="M12 2v2.6M12 19.4V22M2 12h2.6M19.4 12H22M4.9 4.9l1.9 1.9M17.2 17.2l1.9 1.9M19.1 4.9l-1.9 1.9M6.8 17.2l-1.9 1.9"/></svg>',
- "autumn":'<svg class="season__ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 4C10 4 4 10 4 20c10 0 16-6 16-16Z"/><path d="M4 20 13.5 10.5"/></svg>',
- "winter":'<svg class="season__ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18M4.2 7.5l15.6 9M19.8 7.5 4.2 16.5"/><path d="M9.2 4.7 12 6l2.8-1.3M9.2 19.3 12 18l2.8 1.3"/></svg>',
-}
-SECS=[]
-for sk in order:
-    ch,en,col=SEASON[sk]
-    SECS.append(f'''      <section class="season" style="--season:{col}">
-        <header class="season__head">{ICON[sk]}<span class="season__ch">{ch}</span><span class="season__en">{en}</span><span class="season__rule"></span></header>
-        <div class="grid">
-{cards_for(sk)}
-        </div>
-      </section>''')
-ALMANAC="\n".join(SECS)
-# almanac term data for JS (name, yi, ji, verse, season)
-TERM_JS=[{"name":r[0],"yi":r[3],"ji":r[4],"verse":r[6],"season":r[7]} for r in T]
-
-# ================= assemble HTML =================
 TEMPLATE = r'''<!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>單車騎行農民曆 · 路線天時</title>
+<title>小布路書 · Brompton 路線天時</title>
+<link rel="icon" type="image/svg+xml" href='data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 76 52" fill="none" stroke="%232A2622" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"><circle cx="14" cy="40" r="9"/><circle cx="62" cy="40" r="9"/><path d="M62 40 58 22 55.5 6"/><path d="M55.5 6C55 1.5 50 1.5 49 5.5"/><path d="M57.5 25C50 29.5 41 31 33 31.5"/><path d="M34.5 39.5 29 9M23.5 8 31.5 8"/><path d="M34.5 39.5 14 40"/></svg>'>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#F3EEE2">
+<link rel="apple-touch-icon" href="icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
@@ -256,6 +271,7 @@ TEMPLATE = r'''<!DOCTYPE html>
     --good:#6F8A4D; --warn:#C7892F; --risk:#BE3D24; --pine:#4F6157; --yi:#BE3D24;
   }
   *{box-sizing:border-box}
+  [hidden]{display:none !important}   /* 讓 hidden 屬性優先於 .snap-bar / .route-tools 等的 display:flex */
   html{-webkit-text-size-adjust:100%}
   body{margin:0; background:var(--paper); color:var(--body);
     font-family:"Noto Serif TC",serif; line-height:1.7;
@@ -267,6 +283,19 @@ TEMPLATE = r'''<!DOCTYPE html>
     font-size:12px; color:var(--muted); margin:0 0 12px}
   .mast__title{font-weight:900; font-size:clamp(30px,6.4vw,52px); letter-spacing:.12em; margin:0; color:var(--ink); line-height:1.1}
   .mast__sub{font-family:"Fraunces",serif; font-style:italic; font-size:clamp(13px,2.5vw,16px); color:var(--muted); margin:12px 0 0}
+  .method{margin:30px 0 0; border-top:1px solid var(--line); padding:0 6px}
+  .method summary{cursor:pointer; color:var(--muted); font-size:13px; padding:12px 0 10px; letter-spacing:.08em; text-align:center; list-style:none}
+  .method summary::-webkit-details-marker{display:none}
+  .method summary::after{content:"　▾"; font-size:11px}
+  .method[open] summary::after{content:"　▴"}
+  .method summary:hover{color:var(--gold)}
+  .method p{font-size:13px; margin:2px 0 12px}
+  .wrap{position:relative}
+  .lang-sw{position:absolute; top:2px; right:2px; display:flex; gap:3px; z-index:5}
+  .lang-sw button{font-family:inherit; font-size:11px; letter-spacing:.08em; padding:4px 10px; border:1px solid var(--line); background:var(--card); color:var(--muted); cursor:pointer; border-radius:999px}
+  .lang-sw button.on{color:var(--ink); border-color:var(--gold)}
+  html[lang="en"] .term.today .term__name::after{content:" · today"; letter-spacing:.02em}
+  html[lang="en"] .term__verse::before{content:""}
 
   /* today term card */
   .today{display:flex; gap:16px; align-items:center; margin:26px 0 0; background:var(--card);
@@ -280,6 +309,7 @@ TEMPLATE = r'''<!DOCTYPE html>
   .today__yiji{display:flex; flex-wrap:wrap; gap:6px 8px; font-size:13px}
   .today__yiji .t{display:inline-flex; align-items:center; gap:5px}
   .today__yiji .sd{width:20px;height:20px;border-radius:3px;display:grid;place-items:center;color:#FBF8F0;font-weight:700;font-size:12px}
+  html[lang="en"] .today__yiji .sd{width:auto;min-width:20px;padding:0 6px}
 
   /* route input */
   .panel{margin:22px 0 0; background:var(--card); border:1px solid var(--line); border-radius:8px; padding:18px 20px}
@@ -345,12 +375,19 @@ TEMPLATE = r'''<!DOCTYPE html>
   .grade-chips{display:flex; flex-wrap:wrap; align-items:center; gap:5px; margin-top:6px}
   .gk{font-size:11px; letter-spacing:.14em; color:var(--muted); margin-right:2px}
   .gchip{font-size:11.5px; padding:2px 8px; border-radius:999px; color:#FBF8F0; letter-spacing:.02em}
-  .elevcv{display:block; width:100%; height:56px; margin-top:8px; border-bottom:1px solid var(--line)}
+  .elevcv{display:block; width:100%; height:72px; margin-top:8px; border-bottom:1px solid var(--line)}
   .steps-tg{font-size:12px; color:var(--pine); cursor:pointer; background:none; border:0; padding:0; margin-top:8px;
     text-decoration:underline; text-underline-offset:3px; font-family:"Noto Serif TC",serif}
   .steps-list{margin:8px 0 0; padding:0 0 0 4px; list-style:none; font-size:12.5px; color:var(--body); line-height:1.8}
   .steps-list li{border-left:2px solid var(--line); padding-left:10px; margin-bottom:2px}
   .seg-est{color:var(--warn); font-size:11.5px}
+  .mainclimb{color:var(--pine); font-weight:600}
+  .mainclimb.hard{color:var(--risk)}
+  .grade-warn{margin-top:7px; padding:7px 11px; font-size:12.5px; color:var(--risk); line-height:1.6;
+    background:color-mix(in srgb,var(--risk) 7%, transparent);
+    border:1px dashed color-mix(in srgb,var(--risk) 40%, transparent); border-radius:5px}
+  .legend--bands{margin-top:8px}
+  .bands-k{letter-spacing:.06em; color:var(--body)}
 
   .controls{display:flex; flex-wrap:wrap; gap:14px 22px; align-items:center; margin:16px 0 0; padding-top:16px; border-top:1px dashed var(--line)}
   .ctl-group{display:flex; align-items:center; gap:8px}
@@ -385,6 +422,24 @@ TEMPLATE = r'''<!DOCTYPE html>
   .loading__txt{font-size:15px; color:var(--body); letter-spacing:.02em}
   .btn-go:disabled{opacity:.6; cursor:progress}
   @media (prefers-reduced-motion:reduce){ .spinner{animation-duration:2.4s} }
+  @media (prefers-reduced-motion:no-preference){
+    @keyframes riseIn{from{opacity:0; transform:translateY(14px)}to{opacity:1; transform:none}}
+    .mast,.today,.panel{animation:riseIn .6s ease both}
+    .today{animation-delay:.12s} .panel{animation-delay:.22s}
+    .verdict,.tnode,.tseg,.regime,.disclaim{animation:riseIn .5s ease both}
+    @keyframes vpulse{0%,100%{box-shadow:0 0 0 4px color-mix(in srgb,var(--vc,var(--good)) 20%,transparent)}
+      50%{box-shadow:0 0 0 9px color-mix(in srgb,var(--vc,var(--good)) 8%,transparent)}}
+    .vdot{animation:vpulse 2.4s ease-in-out infinite}
+    .tcard{transition:transform .22s ease, box-shadow .22s ease}
+    .tcard:hover{transform:translateY(-2px); box-shadow:0 8px 20px rgba(42,38,34,.10)}
+    .gchip{transition:transform .18s ease}
+    .gchip:hover{transform:translateY(-1px) scale(1.04)}
+    .today__badge{animation:vpulse 3.2s ease-in-out infinite; --vc:var(--tc,var(--good))}
+  }
+  .disclaim{margin:14px 0 0; padding:11px 14px; font-size:13px; color:var(--body); line-height:1.7;
+    background:color-mix(in srgb,var(--warn) 8%, transparent);
+    border:1px solid color-mix(in srgb,var(--warn) 35%, transparent); border-radius:6px}
+  .disclaim b{color:#9a6a1e}
   .vgrid{display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-top:16px}
   .vcell{background:var(--paper); border:1px solid var(--line); border-radius:5px; padding:11px 13px}
   .vcell__k{font-size:11px; letter-spacing:.16em; color:var(--muted); margin:0 0 4px}
@@ -477,64 +532,105 @@ TEMPLATE = r'''<!DOCTYPE html>
     .searchbar{flex-direction:column}
     .btn-go{padding:12px 0}
   }
-</style>
+  .snap-bar{display:flex; align-items:center; gap:10px; margin:12px 0 0; font-size:13px; color:var(--muted); flex-wrap:wrap}
+  .snap-bar .snap-meta{letter-spacing:.02em}
+  .sup-line{font-size:12.5px; color:var(--muted); margin-top:7px}
+  .sup-line .sup-k{color:var(--pine); font-weight:600; margin-right:6px}
+  .sup-line .sup-warn{color:var(--risk); font-weight:600; margin-left:6px}
+  #aiBtn{width:100%}
+  .btn-go:disabled{opacity:.42; cursor:default}
+  #goHint{color:var(--muted)}
+  #goHint.warn{color:var(--warn)}
+  #goBtn{width:100%; margin-top:12px}
+  .go-hint{font-size:12.5px; color:var(--warn); font-weight:600; margin:8px 0 0; letter-spacing:.02em}
+  .sup-fail{font-size:12px; color:var(--muted); margin:2px 0 0; letter-spacing:.02em}
+  </style>
 </head>
 <body>
   <div class="wrap">
+    <div class="lang-sw" role="group" aria-label="Language">
+      <button type="button" data-lang="zh">中</button><button type="button" data-lang="en">EN</button><button type="button" data-lang="ja">日</button>
+    </div>
     <header class="mast">
-      <p class="mast__ey">A Cyclist&#39;s Almanac · Taiwan</p>
-      <h1 class="mast__title">單車騎行農民曆</h1>
-      <p class="mast__sub">Enter any waypoints in order — read the line through the day, and the season</p>
+      <p class="mast__ey">A Brompton Roadbook</p>
+      <h1 class="mast__title">小布路書</h1>
+      <p class="mast__sub" data-i18n="mastSub">Fold out, ride on — read the line through the day, and the season</p>
     </header>
 
     <div class="today" id="todayCard"></div>
 
     <div class="panel">
-      <p class="panel__k">今日騎點 · 貼上整段行程，AI 讀出沿線地點</p>
-      <textarea id="tripText" rows="3" placeholder="貼上路線敘述、遊記或地點清單，例如：花蓮車站出發，經七星潭、新城老街、佳興小吃店，進太魯閣到天祥…"></textarea>
+      <p class="panel__k" data-i18n="panelK">今日騎點 · 貼上整段行程，AI 讀出沿線地點</p>
+      <textarea id="tripText" rows="3" data-i18n-ph="phTrip" placeholder="貼上路線敘述、遊記或地點清單，例如：花蓮車站出發，經七星潭、新城老街、佳興小吃店，進太魯閣到天祥…"></textarea>
+      <div class="sub-div"><span data-i18n="orPick">或逐一挑選</span></div>
+      <div class="wp-list" id="wpList"></div>
+      <div class="combo">
+        <input id="wpInput" type="text" autocomplete="off" data-i18n-ph="phWp" placeholder="輸入地名，如 花蓮車站、淡水、太魯閣… 再從清單點選">
+        <div class="suggest" id="suggest" hidden></div>
+      </div>
+      <div class="sub-div"><span data-i18n="orGpx">或上傳 GPX</span></div>
+      <div class="wp-actions">
+        <label class="mini-btn" for="gpxFile" data-i18n="gpxPick" style="cursor:pointer">選擇 GPX 檔</label>
+        <input type="file" id="gpxFile" hidden>
+        <span class="ai-note" id="gpxNote"></span>
+      </div>
+      <div class="wp-actions">
+        <button class="mini-btn" id="clearBtn" data-i18n="clearBtn">清空路線</button>
+      </div>
+      <p class="hint" data-i18n="hint">每個地點都從清單挑選、帶有確定座標，所以不會認錯地名或定位到錯的地方。</p>
+
+      <div class="controls">
+        <div class="ctl-group"><span class="ctl-label" data-i18n="ctlDate">出發日期</span><input type="date" id="startDate" class="time-input"></div>
+        <div class="ctl-group"><span class="ctl-label" data-i18n="ctlTime">時間</span><input type="time" id="startTime" class="time-input" value="09:00" step="300"></div>
+        <div class="ctl-group"><span class="ctl-label" data-i18n="ctlDwell">每點停留</span><input type="number" id="dwell" class="num-input" value="15" min="0" max="120" step="5"><span class="ctl-label" data-i18n="unitMin">分</span></div>
+        <div class="ctl-group"><button class="toggle" id="revBtn">反轉方向 ⇄</button></div>
+      </div>
       <div class="wp-actions">
         <button class="btn-go" id="aiBtn">AI 解析路線</button>
         <span class="ai-note" id="aiNote"></span>
       </div>
-      <div class="sub-div"><span>或逐一挑選</span></div>
-      <div class="wp-list" id="wpList"></div>
-      <div class="combo">
-        <input id="wpInput" type="text" autocomplete="off" placeholder="輸入地名，如 花蓮車站、淡水、太魯閣… 再從清單點選">
-        <div class="suggest" id="suggest" hidden></div>
-      </div>
-      <div class="wp-actions">
-        <button class="mini-btn" id="clearBtn">清空路線</button>
-      </div>
-      <p class="hint">每個地點都從清單挑選、帶有確定座標，所以不會認錯地名或定位到錯的地方。</p>
-
-      <div class="controls">
-        <div class="ctl-group"><span class="ctl-label">出發時間</span><input type="time" id="startTime" class="time-input" value="06:30" step="300"></div>
-        <div class="ctl-group"><span class="ctl-label">每點停留</span><input type="number" id="dwell" class="num-input" value="15" min="0" max="120" step="5"><span class="ctl-label">分</span></div>
-        <div class="ctl-group"><button class="toggle" id="revBtn">反轉方向 ⇄</button></div>
-      </div>
-      <p class="note-live">天氣為<strong>示範情境</strong>（依季節與地形估算），路徑／坡度／撤退依真實路網計算（需 API 金鑰）；天氣為示範情境，CWA 逐時預報為下一步</p>
+      <button class="btn-go" id="goBtn" hidden data-i18n="goBtn">開始分析</button>
+      <p class="go-hint" id="goHint" hidden></p>
+      <p class="note-live" data-i18n="noteLive">路徑／坡度／撤退依真實路網計算；天氣接 CWA 鄉鎮逐3小時預報（未設金鑰或超出預報範圍時退 Open-Meteo／示範情境，來源如實標示）</p>
     </div>
 
     <div class="verdict" id="verdict"></div>
+    <p class="disclaim" id="disclaim" data-i18n-html="disclaim" hidden>⚠ 路線、坡度、天氣皆為<b>推估</b>：實際狀況因所選路段、地形與季節變化甚大，本分析僅供行前參考，出發前後請以現場路況與官方資訊為準，並自負騎乘安全。</p>
     <div id="map" class="map" hidden></div>
+    <div class="snap-bar" id="snapBar" hidden></div>
     <div class="route-tools" id="routeTools" hidden>
-      <button class="mini-btn" id="gpxBtn">下載 GPX</button>
-      <a class="mini-btn" id="gmapsBtn" target="_blank" rel="noopener">在 Google 地圖開啟導航</a>
+      <button class="mini-btn" id="gpxBtn" data-i18n="gpxBtn">下載 GPX</button>
+      <a class="mini-btn" id="gmapsBtn" target="_blank" rel="noopener" data-i18n="gmapsBtn">在 Google 地圖開啟導航</a>
       <span class="tools-note" id="routeMode"></span>
     </div>
     <div class="timeline" id="timeline"></div>
     <div class="legend">
-      <span><i style="background:var(--good)"></i>宜</span>
-      <span><i style="background:var(--warn)"></i>留意</span>
-      <span><i style="background:var(--risk)"></i>審慎</span>
-      <span>頂風＝逆風而行 · 順風＝風助前進 · 轉進＝就近搭車撤退</span>
+      <span data-i18n-html="lg_yi"><i style="background:var(--good)"></i>宜</span>
+      <span data-i18n-html="lg_warn"><i style="background:var(--warn)"></i>留意</span>
+      <span data-i18n-html="lg_risk"><i style="background:var(--risk)"></i>審慎</span>
+      <span data-i18n="lg_note">頂風＝逆風而行 · 順風＝風助前進 · 轉進＝就近搭車撤退</span>
+    </div>
+    <div class="legend legend--bands">
+      <span class="bands-k" data-i18n="bandsK">坡度分級（每前進 100 公尺的高度變化）</span>
+      <span data-i18n-html="bl_flat"><i style="background:#5FA046"></i>平路 ±2%</span>
+      <span data-i18n-html="bl_gentle"><i style="background:#B08A3E"></i>緩坡 2–5%</span>
+      <span data-i18n-html="bl_steep"><i style="background:#CE8418"></i>陡坡 5–8%</span>
+      <span data-i18n-html="bl_vsteep"><i style="background:#BE5027"></i>很陡 8–12%</span>
+      <span data-i18n-html="bl_extreme"><i style="background:#8C2318"></i>極陡 逾12%</span>
+      <span data-i18n-html="bl_down"><i style="background:#8FA0B5"></i>下坡 −2〜−8%</span>
+      <span data-i18n-html="bl_downS"><i style="background:#4A6076"></i>陡降 低於−8%</span>
     </div>
 
-    <footer class="colophon">
-      <b>基地分析工作站</b> · 單車騎行農民曆（路線天時 + 節氣）原型<br>
-      路線距離＝直線距離 × 1.3 迂迴係數；爬升＝海拔差 + 每公里起伏估算；ETA 依配速 15 km/h 與每點停留推算；頂／順風由每段方位角與當時風向相減。<br>
-      地名座標來自 Open-Meteo Geocoding 與 OpenStreetMap Nominatim、海拔來自 Open-Meteo；天氣為示範情境，實際以出發當日之逐時預報與現場風雨為準。
-    </footer>
+    <details class="method" id="method">
+      <summary data-i18n="mSummary">這些時刻怎麼算？——834 趟實騎的校準方法</summary>
+      <div data-i18n-html="mBody">
+      <p>本站的抵達時刻不是理論值，而是從車主 2018–2026 年間以 Brompton 實際完成、記錄於 Komoot 的 939 趟騎乘中校準出來的。剔除非單車活動、短於 3 公里或缺時間戳的紀錄後，留下 <b>834 趟、約 31,790 公里、六百二十萬個軌跡點</b>。</p>
+      <p>每條軌跡先做高程清理：沿線以 ±100 公尺視窗中位數濾波去除尖刺，再每 30 公尺重取樣、±60 公尺移動平均平滑；坡度取 ±50 公尺視窗的高差比，據此把每一小段歸入七個坡度帶——陡降（≤−8%）、下坡、平路（−2〜2%）、緩坡、陡坡、很陡、極陡（&gt;12%）。</p>
+      <p>速度統計剔除近乎靜止（&lt;1.5 km/h）、GPS 突跳（&gt;80 km/h）與錄製斷點（相鄰點時距 ≥10 秒的橋接段）後，各帶採<b>有效速度＝Σ距離 ÷ Σ移動時間</b>——而非平均巡航速度：慢的路段按時間放大權重，算出來的才是「抵達時刻」真正需要的數字。樣本以近 24 個月為主，不足的帶回退全庫。</p>
+      <p>交叉驗證：全庫算得的平路有效速度 16.3 km/h，與另一趟獨立實騎量得、並通過沿線抵達時刻三分鐘誤差檢驗的 16.2 幾乎重合；各爬坡帶亦互相印證。唯一例外是極陡帶，樣本僅 29 公里且受高程雜訊污染，故採保守值。各帶數值見頁尾；每點停留時間由上方欄位另行輸入，不混入配速。</p></div>
+    </details>
+
+    <footer class="colophon" data-i18n-html="colophon"></footer>
   </div>
 
 <script>
@@ -544,7 +640,9 @@ const TERM_STARTS = /*__TSTARTS__*/;
 const STATIONS = /*__STATIONS__*/;
 const SEASON_COLOR = {spring:"#5FA046",summer:"#CE8418",autumn:"#BE5027",winter:"#34877C"};
 
-let START = 390, DWELL = 15, REVERSED = false;
+let START = 540, DWELL = 15, REVERSED = false;
+let START_DATE = (()=>{const d=new Date(); d.setHours(0,0,0,0); return d;})();
+const dateISO = d => d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
 let ROUTE = [];   // resolved gazetteer entries in order
 
 // ---------- resolve place names (curated fast-path, then live geocode) ----------
@@ -559,16 +657,74 @@ function inferZone(p){
   return "basin";
 }
 // ---------- geocode search: return multiple suggestions (Open-Meteo, CORS-friendly) ----------
+const XB_NOMI='https://nominatim.openstreetmap.org/search';
+function xbLocalEq(top, name){
+  // 內建命中是否可直接採信:正名相等/正名包含/任一別名相等(含去站尾比對)
+  if(normName(top.n)===normName(name)) return true;
+  if(top.n.includes(name)) return true;
+  const al=(top.g&&top.g.a)||[];
+  return al.some(a=> a===name || (a.length>=3 && normName(a)===normName(name)));
+}
+function xbVariants(q){
+  const v=[q];
+  if(/火車站$/.test(q)){ v.push(q.replace(/火車站$/,'車站')); }
+  else if(/車站$/.test(q)){ v.push(q.replace(/車站$/,'火車站')); }
+  else if(/站$/.test(q)&&!/捷運站$/.test(q)){ v.push(q.replace(/站$/,'車站')); }
+  if(/浴場$/.test(q)&&!/海水浴場$/.test(q)) v.push(q.replace(/浴場$/,'海水浴場'));
+  return [...new Set(v)].slice(0,2);
+}
+async function xbNomi(params){
+  const r=await fetch(XB_NOMI+'?format=json&accept-language=zh-TW,en&limit=3&'+params);
+  if(!r.ok) throw new Error('nominatim '+r.status);
+  const j=await r.json();
+  return (j||[]).map(p=>({name:(p.display_name||'').split(',')[0],address:p.display_name||'',lat:+p.lat,lng:+p.lon}))
+                .filter(p=>isFinite(p.lat)&&isFinite(p.lng));
+}
+async function xbGeocode(qn, region, near, opt){
+  opt = opt || {};
+  // 第一發:伺服器(設了 GOOGLE_MAPS_API_KEY 時語意定位一發即中;無鑰時單次 Nominatim)
+  try{
+    const p=new URLSearchParams({q:qn}); if(region)p.set('region',region);
+    if(near)p.set('near',near.lat+','+near.lng);
+    const r=await fetch(API('/api/geocode?')+p.toString());
+    if(r.ok){ const j=await r.json(); if(j.results&&j.results.length) return j.results; }
+  }catch(e){}
+  // 直連 Nominatim:住宅 IP、至多 4 發、間隔 300ms;視窗→台灣→同義→全球(閘門+排序)
+  const nearTW = near ? (near.lat>20&&near.lat<27&&near.lng>118&&near.lng<123.5) : true;
+  const H=x=>haversine({lat:x.lat,lng:x.lng},near);
+  const vars=xbVariants(qn);
+  const tries=[];
+  if(near&&nearTW){ const hb=0.25, vb=`viewbox=${(near.lng-hb).toFixed(3)},${(near.lat+hb).toFixed(3)},${(near.lng+hb).toFixed(3)},${(near.lat-hb).toFixed(3)}`;
+    tries.push({q:vars[0], p:`countrycodes=tw&${vb}&q=`+encodeURIComponent(vars[0])}); }
+  if(nearTW) for(const v of vars) tries.push({q:v, p:'countrycodes=tw&q='+encodeURIComponent(v+' 台灣')});
+  tries.push({q:vars[0], p:'q='+encodeURIComponent(vars[0]+(region?' '+region:'')), glob:true});
+  let best=null;
+  for(const t of tries.slice(0, opt.quick?2:4)){
+    try{
+      let rs=await xbNomi(t.p);
+      if(near && opt.gate!==false) rs=rs.filter(x=>H(x)<=250);
+      const sc=x=>{ const nn=x.name||'', qq=t.q||qn;
+        if(nn===qq) return 0;
+        if(nn.startsWith(qq)||(qq.startsWith(nn)&&nn.length>=qq.length*0.8)) return 0;
+        if(nn.includes(qq)) return 1;
+        if(qq.includes(nn)) return 3;
+        return 2; };
+      rs=rs.slice().sort((a,b)=> sc(a)-sc(b) || (near?H(a)-H(b):0));
+      // 品質不佳且後面還有招式 → 繼續試,不急著收下勉強的結果
+      if(rs.length && (sc(rs[0])<=1 || t===tries[tries.length-1])) return rs;
+      if(rs.length) best = best || rs;
+    }catch(e){ console.warn('[定位]', String(e&&e.message||e)); }
+    await new Promise(r=>setTimeout(r, opt.quick?150:300));
+  }
+  return best;
+}
 async function searchGeocode(q){
   try{
-    const res=await fetch("https://geocoding-api.open-meteo.com/v1/search?count=6&language=zh&format=json&name="+encodeURIComponent(q));
-    if(!res.ok) return {err:true};
-    const j=await res.json();
-    if(!j.results) return {results:[]};
-    let rs=j.results.filter(r=>r.country_code==="TW"); if(!rs.length) rs=j.results;
-    return {results: rs.map(r=>({
-      n:r.name, lat:r.latitude, lng:r.longitude, elev:(r.elevation??null),
-      region:[r.admin1,r.admin3,r.admin2].find(Boolean)||r.country||""
+    const lastW=WAYPOINTS[WAYPOINTS.length-1]||null;
+    const rs=await xbGeocode(q, "", lastW, {gate:false, quick:true});
+    return {results:(rs||[]).slice(0,5).map(r=>({
+      n:r.name, lat:r.lat, lng:r.lng, elev:null,
+      region:(r.address||"").split(",")[1]?.trim()||""
     }))};
   }catch(e){ return {err:true}; }
 }
@@ -588,7 +744,7 @@ async function fillElevations(list){
 function showLoading(txt){
   const v=document.getElementById('verdict');
   v.style.setProperty('--vc','var(--gold)');
-  v.innerHTML='<div class="loading"><span class="spinner"></span><span class="loading__txt">'+(txt||'查詢地點中…')+'</span></div>';
+  v.innerHTML='<div class="loading"><span class="spinner"></span><span class="loading__txt">'+(txt||tx('ldPlaces'))+'</span></div>';
   document.getElementById('timeline').innerHTML="";
 }
 
@@ -606,6 +762,19 @@ function bearing(a,b){
 }
 function angDiff(a,b){ let d=Math.abs(a-b)%360; return d>180?360-d:d; }
 const DETOUR=1.3, ROLL=6, SPEED=15, CLIMB=0.06;
+// 坡度分段配速（km/h，ETA 用「有效速度」= Σ距離÷Σ移動時間）：v1.9.1 依 Komoot 2024–2026 全庫 834 趟完騎校準
+// 採 clean 有效速度（排除 dt≥10s 錄製斷點；長停等由「每點停留」另計）：
+// 平路16.3 · 緩坡12 · 陡坡8.2 · 很陡6.6 · 極陡4.5（樣本污染，取保守值） · 下坡21.2 · 陡降19.7
+// 巡航中位數僅供顯示參考、勿餵 ETA：平路18.7 · 緩坡13.3 · 下坡25.5 · 陡降23.7
+function paceKmh(g){ return g<=-8?19.7 : g<-2?21.2 : g<=2?16.3 : g<=5?12 : g<=8?8.2 : g<=12?6.6 : 4.5; }
+function segMinutes(seg){
+  if(seg.grades && seg.grades.samples.length){
+    let min=0;
+    seg.grades.samples.forEach(s=>{ min += ((s.d1-s.d0)/1000) / paceKmh(s.g) * 60; });
+    return min;
+  }
+  return seg.dist/SPEED*60 + seg.up*CLIMB;   // 無剖面時退回舊估法
+}
 
 // ---------- weather (illustrative, by zone + elevation) ----------
 function lerp(pts,h){
@@ -614,7 +783,7 @@ function lerp(pts,h){
   for(let i=0;i<pts.length-1;i++){const[h0,v0]=pts[i],[h1,v1]=pts[i+1];if(h>=h0&&h<=h1)return v0+(v1-v0)*(h-h0)/(h1-h0);}
   return pts[pts.length-1][1];
 }
-function wx(wz, elev, hour){
+function wxSim(wz, elev, hour){
   elev = elev || 0;
   const h=hour;
   let temp = lerp([[5,25],[8,28],[11,31],[14,33],[16,32],[18,30]],h) - elev/1000*6.5;
@@ -638,11 +807,60 @@ function wx(wz, elev, hour){
   uv=Math.max(0,Math.round(uv));
   return {temp:Math.round(temp), uv, rain:Math.round(rain), windFrom, windSpd:Math.round(windSpd)};
 }
-function cond(r){ return r>=60?"雷陣雨":r>=45?"陣雨機率高":r>=28?"多雲時陰":"多雲到晴"; }
+function cond(r){ return r>=60?tx('wxTS'):r>=45?tx('wxShwr'):r>=28?tx('wxCloudy'):tx('wxFair'); }
+
+// ---------- live weather (CWA via /api/weather, Open-Meteo fallback) ----------
+let WXMAP=new Map(), WXSRC={k:'demo'};
+const wxKey=p=>p.lat.toFixed(3)+","+p.lng.toFixed(3);
+async function fetchWeather(){
+  WXMAP=new Map(); WXSRC={k:'demo'};
+  const pts=ROUTE.slice(0,12);
+  if(!pts.length) return;
+  try{
+    const r=await fetch(API('/api/weather'),{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({points:pts.map(p=>({lat:p.lat,lng:p.lng})), date:dateISO(START_DATE)})});
+    if(!r.ok) return;
+    const j=await r.json();
+    (j.points||[]).forEach((rec,i)=>{
+      if(rec && rec.hourly && rec.hourly.time && rec.hourly.time.length) WXMAP.set(wxKey(pts[i]),rec);
+    });
+    const first=(j.points||[]).find(x=>x&&x.source&&x.source!=="none");
+    if(first) WXSRC = first.source==="cwa" ? {k:'cwa',l:first.label||""} : first.source==="open-meteo" ? {k:'om'} : {k:'demo'};
+  }catch(e){}
+}
+function interp(times, vals, ms, circular){
+  if(!vals) return null;
+  let i=0; while(i<times.length-1 && times[i+1]<=ms) i++;
+  const a=vals[i], b=vals[Math.min(i+1,vals.length-1)];
+  if(a==null&&b==null) return null;
+  if(a==null) return b; if(b==null) return a;
+  const t0=times[i], t1=times[Math.min(i+1,times.length-1)];
+  const f=t1>t0 ? Math.min(1,Math.max(0,(ms-t0)/(t1-t0))) : 0;
+  if(circular) return f<0.5?a:b;
+  return a+(b-a)*f;
+}
+function wx(pt, hour){
+  const rec=WXMAP.get(wxKey(pt));
+  const sim=wxSim(pt.wz, pt.elev, ((hour%24)+24)%24);
+  if(!rec) return sim;
+  const ms=START_DATE.getTime()+hour*3600*1000;
+  const H=rec.hourly, T=H.time;
+  if(ms<T[0]-3*3600e3 || ms>T[T.length-1]+3*3600e3) return sim;   // 超出預報範圍
+  const temp=interp(T,H.temp,ms), pop=interp(T,H.pop,ms),
+        ws=interp(T,H.windSpd,ms), wd=interp(T,H.windDirDeg,ms,true),
+        uv=interp(T,H.uvi,ms);
+  return {
+    temp: temp!=null?Math.round(temp):sim.temp,
+    uv:   uv!=null?Math.max(0,Math.round(uv)):sim.uv,
+    rain: pop!=null?Math.round(pop):sim.rain,
+    windFrom: wd!=null?wd:sim.windFrom,
+    windSpd:  ws!=null?Math.round(ws):sim.windSpd,
+  };
+}
 
 // ---------- today's solar term ----------
-function todayTerm(){
-  const now=new Date(), ord=(now.getMonth()+1)*100+now.getDate();
+function termFor(dt){
+  const ord=(dt.getMonth()+1)*100+dt.getDate();
   let best=-1, bestOrd=-1;
   for(let i=0;i<TERM_STARTS.length;i++){
     const o=TERM_STARTS[i][0]*100+TERM_STARTS[i][1];
@@ -659,10 +877,10 @@ function build(){
     let seg=null;
     if(i>0){
       seg = SEGDATA[i-1] || estSegment(pts[i-1],pts[i]);
-      t += seg.dist/SPEED*60 + seg.up*CLIMB;
+      t += segMinutes(seg);
     }
     const arrMin=t, hour=arrMin/60;
-    const w=wx(pts[i].wz, pts[i].elev, hour);
+    const w=wx(pts[i], hour);
     let wind=null;
     if(i>0){
       const br=bearing(pts[i-1],pts[i]);
@@ -677,31 +895,33 @@ function build(){
     if(w.temp>=33)score+=1;
     if(w.temp<=8)score+=1;                       // cold exposure (alpine mornings)
     if(wind&&wind.kind==="head"&&wind.spd>=18)score+=1;
+    if(seg&&seg.maxG!=null){ if(seg.maxG>=15)score+=2; else if(seg.maxG>=10)score+=1; }
     if(pts[i].esc.hard)score+=1;
     const tier=score>=4?"risk":score>=2?"warn":"good";
     rows.push({pt:pts[i],seg,arrMin,w,wind,tier,score});
-    if(i<pts.length-1) t+=DWELL;
+    if(i>0 && i<pts.length-1) t+=DWELL;   // 起點不計停留：出發時間＝離開起點的時刻
   }
   return rows;
 }
 
 // ---------- render ----------
 const fmt=m=>{m=Math.round(m);let h=Math.floor(m/60)%24,mm=((m%60)+60)%60;return String(h).padStart(2,'0')+":"+String(mm).padStart(2,'0');};
-const fmtD=m=>{const d=Math.floor(Math.round(m)/1440); return fmt(m)+(d>=1?` <span style="color:var(--risk)">(+${d}日)</span>`:"");};
+const fmtD=m=>{const d=Math.floor(Math.round(m)/1440); return fmt(m)+(d>=1?tx('daysLate')(d):"");};
 const COLOR={good:"var(--good)",warn:"var(--warn)",risk:"var(--risk)"};
 
 function renderToday(){
-  const ti=todayTerm(), tt=TERMS[ti], col=SEASON_COLOR[tt.season];
+  const ti=termFor(new Date()), tt=TERMS[ti], col=SEASON_COLOR[tt.season];
   const c=document.getElementById('todayCard');
   c.style.setProperty('--tc',col);
+  const LT=tv(tt);
   c.innerHTML=`
     <div class="today__badge"><span class="today__ch">${tt.name}</span></div>
     <div class="today__body">
-      <p class="today__k">今日節氣</p>
-      <p class="today__verse">${tt.verse}</p>
+      <p class="today__k">${tx('todayTerm')}</p>
+      <p class="today__verse">${LT.verse}</p>
       <div class="today__yiji">
-        <span class="t"><span class="sd" style="background:var(--yi)">宜</span>${tt.yi.join(" · ")}</span>
-        <span class="t"><span class="sd" style="background:var(--ink)">忌</span>${tt.ji.join(" · ")}</span>
+        <span class="t"><span class="sd" style="background:var(--yi)">${tx('yiChar')}</span>${LT.yi.join(" · ")}</span>
+        <span class="t"><span class="sd" style="background:var(--ink)">${tx('jiChar')}</span>${LT.ji.join(" · ")}</span>
       </div>
     </div>`;
   return tt;
@@ -711,16 +931,16 @@ function renderRoute(){
   const v=document.getElementById('verdict'), tl=document.getElementById('timeline');
   if(ROUTE.length<2){
     v.style.setProperty('--vc','var(--line)');
-    v.innerHTML=`<p class="empty">打字搜尋地點、從清單挑選加入（或點熱門騎點）；加到兩個以上，就會分析今天這條路線的天時。</p>`;
+    v.innerHTML=`<p class="empty">${tx('emptyRoute')}</p>`;
     tl.innerHTML=""; return;
   }
   const rows=build();
-  const tt=TERMS[todayTerm()];
+  const tt=TERMS[termFor(START_DATE)], LT=tv(tt);
 
   let worst=rows[0]; rows.forEach(r=>{if(r.score>worst.score)worst=r;});
   const heads=rows.filter(r=>r.wind&&r.wind.kind==="head");
   const tier=worst.tier;
-  const statusText={good:"今日宜騎",warn:"可騎 · 留意時段",risk:"審慎 · 有高風險段"}[tier];
+  const statusText={good:tx('statusGood'),warn:tx('statusWarn'),risk:tx('statusRisk')}[tier];
 
   const nameList=(REVERSED?[...ROUTE].reverse():ROUTE).map(p=>p.n);
   const totalKm=rows.reduce((s,r)=>s+(r.seg?r.seg.dist:0),0);
@@ -728,28 +948,29 @@ function renderRoute(){
   const hasGeo=ROUTE.some(p=>p.src==="geo");
   const straight=rows.reduce((s,r,i)=>s+(i>0?haversine(rows[i-1].pt,rows[i].pt):0),0);
   const implausible = hasGeo && ROUTE.length>1 && straight/(ROUTE.length-1) > 40;
+  const dt = ROUTE.length>=3 ? xbDetour(ROUTE) : null;
+  const detourBad = dt && dt.extra > Math.max(15, straight*0.25);
 
-  let sent=`${worst.pt.n}於 <b>${fmtD(worst.arrMin)}</b> 抵達，正逢${cond(worst.w.rain)}（降雨 ${worst.w.rain}%）、UV ${worst.w.uv}、氣溫 ${worst.w.temp}°`
-         +(worst.wind?`、${worst.wind.label} ${worst.wind.spd} km/h`:"")+`，為全程風險最高的一段。`;
-  const headTxt=heads.length?heads.map(r=>r.pt.n).join("、")+" 頂風":"全程無明顯逆風";
+  let sent=tx('worstLine')(worst.pt.n, fmtD(worst.arrMin), cond(worst.w.rain), worst.w.rain, worst.w.uv, worst.w.temp, worst.wind, (worst.seg&&worst.seg.maxG>=10)?worst.seg.maxG:0);
+  const headTxt=heads.length?tx('headsLine')(heads.map(r=>r.pt.n)):tx('noHead');
   let rec;
   if(worst.tier==="risk"){
-    rec=`風險集中在 <b>${fmtD(worst.arrMin)} 的${worst.pt.n}</b>。可試著 <b>提早出發</b>、<b>縮短每點停留</b>，或 <b>反轉方向</b>，把高風險點的抵達時刻挪開午後對流。`;
+    rec=tx('recChallenge')(fmtD(worst.arrMin), worst.pt.n);
   } else {
-    rec=`目前排程的節奏尚可；若要更保險，把暴露路段的抵達時刻壓在午前最穩妥。今日${tt.name}，${tt.verse}`;
+    rec=tx('recOk')(LT.name, LT.verse);
   }
 
   v.style.setProperty('--vc', implausible?'var(--risk)':COLOR[tier]);
   v.innerHTML=`
-    ${implausible?'<p class="route-warn">⚠ 路線總距離偏大（約 '+totalKm.toFixed(0)+' km），可能有地名被定位到錯誤位置。請在可疑地名後加上縣市或鄰近大地標，再查一次。</p>':''}
+    ${implausible?'<p class="route-warn">'+tx('implausible')(totalKm.toFixed(0))+'</p>':''}${detourBad?'<p class="route-warn">'+tx('detourWarn')(dt.n, dt.extra.toFixed(0))+'</p>':''}
     <p class="route-title">${nameList.join(" → ")}</p>
-    <p class="route-sub">${ROUTE.length} 點 · 約 ${totalKm.toFixed(0)} km · 估計爬升 ~${Math.round(totalUp/10)*10} m · 今日${tt.name}</p>
+    <p class="route-sub">${tx('routeSub')(ROUTE.length, totalKm.toFixed(0), Math.round(totalUp/10)*10, LT.name, wxName(WXSRC))}</p>${SUP_FAIL?`<p class="sup-fail">${tx('supFail')}</p>`:''}
     <div class="verdict__top"><span class="vdot"></span><span class="vstatus">${statusText}</span></div>
     <p class="vsent">${sent}</p>
     <div class="vgrid">
-      <div class="vcell"><p class="vcell__k">最糟時段 / 地點</p><p class="vcell__v">${fmtD(worst.arrMin)} · ${worst.pt.n}</p></div>
-      <div class="vcell"><p class="vcell__k">風向</p><p class="vcell__v">${headTxt}</p></div>
-      <div class="vcell"><p class="vcell__k">抵達終點</p><p class="vcell__v">${fmtD(rows[rows.length-1].arrMin)} · ${rows[rows.length-1].pt.n}</p></div>
+      <div class="vcell"><p class="vcell__k">${tx('vkChallenge')}</p><p class="vcell__v">${fmtD(worst.arrMin)} · ${worst.pt.n}</p></div>
+      <div class="vcell"><p class="vcell__k">${tx('vkWind')}</p><p class="vcell__v">${headTxt}</p></div>
+      <div class="vcell"><p class="vcell__k">${tx('vkArrive')}</p><p class="vcell__v">${fmtD(rows[rows.length-1].arrMin)} · ${rows[rows.length-1].pt.n}</p></div>
     </div>
     <p class="vrec">${rec}</p>`;
 
@@ -760,27 +981,49 @@ function renderRoute(){
       const S=r.seg;
       const seg=document.createElement('div'); seg.className="tseg";
       let head=`<b>${S.dist.toFixed(1)} km</b> · ↑${Math.round(S.up)}m ↓${Math.round(S.down)}m`
-        + (r.wind?` · ${r.wind.label} ${r.wind.spd}`:"")
-        + (S.est?` · <span class="seg-est">直線推估</span>`:"");
+        + (r.wind?` · ${tx('wind_'+r.wind.kind)} ${r.wind.spd}`:"")
+        + (S.est?` · <span class="seg-est">${tx('segEst')}</span>`:"");
       let gradeHtml="";
+      let gradeWarn="";
       if(S.bands){
-        head += ` · 均坡 ${S.avgG}% · 最陡 ${S.maxG}%`;
-        const B=S.bands, lbl={flat:"平路",gentle:"緩坡",steep:"陡坡",vsteep:"很陡",extreme:"極陡"},
-              col={flat:"#5FA046",gentle:"#B08A3E",steep:"#CE8418",vsteep:"#BE5027",extreme:"#8C2318"};
+        const mg = S.maxG>=10 ? `<b style="color:var(--risk)">${S.maxG}%</b>` : `${S.maxG}%`;
+        head += tx('segGrade')(S.avgG, mg)
+              + (S.grades&&S.grades.repaired?tx('segRepaired')(S.grades.repaired):"")
+              + (S.artifact?tx('segArtifact'):"")
+              + (S.noisy?tx('segNoisy'):"");
+        const B=S.bands,
+              lbl=tx('bands'),
+              col={flat:"#5FA046",gentle:"#B08A3E",steep:"#CE8418",vsteep:"#BE5027",extreme:"#8C2318",down:"#8FA0B5",downS:"#4A6076"},
+              tip=tx('bandTips');
         const km=m=> m>=950 ? (m/1000).toFixed(1)+" km" : Math.round(m/50)*50+" m";
-        gradeHtml='<div class="grade-chips"><span class="gk">坡度組成</span>'+Object.keys(B).filter(k=>B[k]>=100)
-          .map(k=>`<span class="gchip" style="background:${col[k]}">${lbl[k]} ${km(B[k])}</span>`).join("")+'</div>';
+        gradeHtml='<div class="grade-chips"><span class="gk" title="'+tx('gradeTitle')+'">'+tx('gradeComp')+'</span>'
+          +["flat","gentle","steep","vsteep","extreme","down","downS"]
+          .filter(k=>B[k]>=100)
+          .map(k=>`<span class="gchip" style="background:${col[k]}" title="${tip[k]}">${lbl[k]} ${km(B[k])}</span>`).join("")+'</div>';
+        const MC=S.mainClimb;
+        if(MC && MC.gain>=60){
+          const hard = MC.avg>=8 || MC.gain>=250;
+          head += ` · <span class="mainclimb${hard?' hard':''}">${tx('mainClimb')((MC.len/1000).toFixed(1),Math.round(MC.gain),MC.avg.toFixed(1))}</span>`;
+        }
+        if(S.maxG>=10 || (MC && MC.avg>=9 && MC.gain>=150))
+          gradeWarn=`<div class="grade-warn">${tx('gwHead')}${MC&&MC.avg>=9&&MC.gain>=150?tx('gwMain')((MC.len/1000).toFixed(1),MC.avg.toFixed(1),Math.round(MC.gain)):""}${S.maxG>=10?`${MC&&MC.avg>=9&&MC.gain>=150?tx('gwJoin'):""}`+tx('gwMax')(S.maxG):""}${tx('gwTail')}${S.bands.downS>=300?tx('gwDown'):""}</div>`;
+      }
+      // 路網終點與目的地高程落差（如桃源谷：可騎道路盡頭之後為步道）
+      if(!S.est && S.grades && r.pt && isFinite(r.pt.elev)){
+        const endEle=S.grades.profile[S.grades.profile.length-1].e;
+        const gap=r.pt.elev-endEle;
+        if(gap>60) head += tx('segGap')(Math.round(endEle), r.pt.n, Math.round(gap));
       }
       const cvId="cv"+i;
       const stepsHtml = S.steps && S.steps.length
-        ? `<button class="steps-tg" data-tg="st${i}">逐步指示（${S.steps.length}）</button>
+        ? `<button class="steps-tg" data-tg="st${i}">${tx('steps')(S.steps.length)}</button>
            <ul class="steps-list" id="st${i}" hidden>${S.steps.map(s=>`<li>${s.instruction}${s.distance?` <span style="color:var(--muted)">· ${s.distance>=1000?(s.distance/1000).toFixed(1)+" km":s.distance+" m"}</span>`:""}</li>`).join("")}</ul>`
         : "";
-      seg.innerHTML=`<div class="tseg__inner">${head}${gradeHtml}`
+      seg.innerHTML=`<div class="tseg__inner">${head}${gradeHtml}${gradeWarn}${supHtml(S)}`
         + (S.grades?`<canvas class="elevcv" id="${cvId}"></canvas>`:"")
         + stepsHtml + `</div>`;
       tl.appendChild(seg);
-      if(S.grades) drawElev(cvId, S.grades);
+      if(S.grades) drawElev(cvId, S.grades, S.steps);
       const tg=seg.querySelector('.steps-tg');
       if(tg) tg.addEventListener('click',()=>{ const el=document.getElementById(tg.dataset.tg); el.hidden=!el.hidden; });
     }
@@ -788,19 +1031,20 @@ function renderRoute(){
     const sheltered=["basin","valley","lake"], exposedZ=["coast","exposed"];
     if(i>0 && sheltered.includes(prevWz) && exposedZ.includes(wz)){
       const rg=document.createElement('div'); rg.className="regime";
-      rg.innerHTML=`<div class="regime__b">⚑ 遮蔽 → 暴露：離開遮蔽地形，進入開闊／濱海／高地，風雨自此見真章</div>`;
+      rg.innerHTML=`<div class="regime__b">${tx('regime')}</div>`;
       tl.appendChild(rg);
     }
     const w=r.w, wind=r.wind;
     const rainCls=w.rain>=60?"hi":w.rain>=28?"mid":"";
     const uvCls=w.uv>=10?"hi":"";
     const escSvg=`<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 15h16M6 15V7a2 2 0 012-2h8a2 2 0 012 2v8M8 19v2M16 19v2M9 11h6"/></svg>`;
-    const windPill=wind?`<span class="pill pill--wind ${wind.kind}"><span class="warr" style="transform:rotate(${wind.rot}deg)"></span>${wind.label} ${wind.spd} km/h</span>`:"";
+    const windPill=wind?`<span class="pill pill--wind ${wind.kind}"><span class="warr" style="transform:rotate(${wind.rot}deg)"></span>${tx('wind_'+wind.kind)} ${wind.spd} km/h</span>`:"";
     const node=document.createElement('div'); node.className="tnode"; node.style.setProperty('--sc',COLOR[r.tier]);
+    node.style.animationDelay=(Math.min(i,10)*70)+"ms";
     const rt = r.pt.retreat;
     const escTxt = rt
-      ? `轉進機會：${rt.st}（${rt.road?"路網":"估"} ${rt.km} km）${rt.hard?" · 距離偏遠":""}`
-      : `轉進機會：${r.pt.esc.st}${r.pt.esc.km>0&&!r.pt.esc.hard?`（${r.pt.esc.km} km）`:""}`;
+      ? tx('retreatRt')(staFmtRt(rt.st), rt.road?tx('rtRoad'):tx('rtEst'), rt.km, rt.hard)
+              : tx('retreatEsc')(r.pt.esc.st, (r.pt.esc.km>0&&!r.pt.esc.hard)?r.pt.esc.km:0);
     const escHard = rt ? rt.hard : r.pt.esc.hard;
     node.innerHTML=`
       <span class="tdot"></span>
@@ -819,21 +1063,513 @@ function renderRoute(){
 }
 
 // ================= waypoint builder (autocomplete + chips) =================
+
+/* ================= i18n (zh / en / ja) ================= */
+const I18N = {
+zh:{
+ title:"小布路書 · Brompton 路線天時",
+ mastSub:"Fold out, ride on — read the line through the day, and the season",
+ panelK:"今日騎點 · 貼上整段行程，AI 讀出沿線地點",
+ phTrip:"貼上路線敘述、遊記或地點清單，例如：花蓮車站出發，經七星潭、新城老街、佳興小吃店，進太魯閣到天祥…",
+ aiBtn:"AI 解析路線", aiBusy:"AI 解析中…",
+ orPick:"或逐一挑選",
+ phWp:"輸入地名，如 花蓮車站、淡水、太魯閣… 再從清單點選",
+ clearBtn:"清空路線",
+ hint:"每個地點都從清單挑選、帶有確定座標，所以不會認錯地名或定位到錯的地方。",
+ ctlDate:"出發日期", ctlTime:"時間", ctlDwell:"每點停留", unitMin:"分",
+ revOff:"反轉方向 ⇄", revOn:"已反轉方向 ⇄",
+ noteLive:"路徑／坡度／撤退依真實路網計算；天氣接 CWA 鄉鎮逐3小時預報（未設金鑰或超出預報範圍時退 Open-Meteo／示範情境，來源如實標示）",
+ disclaim:"⚠ 路線、坡度、天氣皆為<b>推估</b>：實際狀況因所選路段、地形與季節變化甚大，本分析僅供行前參考，出發前後請以現場路況與官方資訊為準，並自負騎乘安全。",
+ gpxBtn:"下載 GPX", gmapsBtn:"在 Google 地圖開啟導航",
+ lg_yi:'<i style="background:var(--good)"></i>宜', lg_warn:'<i style="background:var(--warn)"></i>留意', lg_risk:'<i style="background:var(--risk)"></i>審慎',
+ lg_note:"頂風＝逆風而行 · 順風＝風助前進 · 轉進＝就近搭車撤退",
+ bandsK:"坡度分級（每前進 100 公尺的高度變化）",
+ bl_flat:'<i style="background:#5FA046"></i>平路 ±2%', bl_gentle:'<i style="background:#B08A3E"></i>緩坡 2–5%',
+ bl_steep:'<i style="background:#CE8418"></i>陡坡 5–8%', bl_vsteep:'<i style="background:#BE5027"></i>很陡 8–12%',
+ bl_extreme:'<i style="background:#8C2318"></i>極陡 逾12%', bl_down:'<i style="background:#8FA0B5"></i>下坡 −2〜−8%',
+ bl_downS:'<i style="background:#4A6076"></i>陡降 低於−8%',
+ mSummary:"這些時刻怎麼算？——834 趟實騎的校準方法",
+ mBody:"<p>本站的抵達時刻不是理論值，而是從車主 2018–2026 年間以 Brompton 實際完成、記錄於 Komoot 的 939 趟騎乘中校準出來的。剔除非單車活動、短於 3 公里或缺時間戳的紀錄後，留下 <b>834 趟、約 31,790 公里、六百二十萬個軌跡點</b>。</p><p>每條軌跡先做高程清理：沿線以 ±100 公尺視窗中位數濾波去除尖刺，再每 30 公尺重取樣、±60 公尺移動平均平滑；坡度取 ±50 公尺視窗的高差比，據此把每一小段歸入七個坡度帶——陡降（≤−8%）、下坡、平路（−2〜2%）、緩坡、陡坡、很陡、極陡（&gt;12%）。</p><p>速度統計剔除近乎靜止（&lt;1.5 km/h）、GPS 突跳（&gt;80 km/h）與錄製斷點（相鄰點時距 ≥10 秒的橋接段）後，各帶採<b>有效速度＝Σ距離 ÷ Σ移動時間</b>——而非平均巡航速度：慢的路段按時間放大權重，算出來的才是「抵達時刻」真正需要的數字。樣本以近 24 個月為主，不足的帶回退全庫。</p><p>交叉驗證：全庫算得的平路有效速度 16.3 km/h，與另一趟獨立實騎量得、並通過沿線抵達時刻三分鐘誤差檢驗的 16.2 幾乎重合；各爬坡帶亦互相印證。唯一例外是極陡帶，樣本僅 29 公里且受高程雜訊污染，故採保守值。各帶數值見頁尾；每點停留時間由上方欄位另行輸入，不混入配速。</p>",
+ colophon:'<b>小布路書</b> · Brompton Roadbook（原「單車騎行農民曆」）· 版本 <b>v2.6.3</b>（2026-09-10）<br>© 2026 Chang Chun-Yen · HEALS Design · 版權所有，未經授權請勿轉載<br>路線、坡度、天氣皆為推估，僅供參考；騎乘安全請自行評估。<br>路線距離＝直線距離 × 1.3 迂迴係數；爬升＝海拔差 + 每公里起伏估算；ETA 依坡度分段配速（平路16.3・緩坡12・陡坡8.2・很陡6.6・極陡4.5・下坡21.2・陡降19.7 km/h，2024–2026 Komoot 834 趟完騎有效速度校準）與每點停留推算；頂／順風由每段方位角與當時風向相減。<br>地名座標來自 Open-Meteo Geocoding 與 OpenStreetMap Nominatim、海拔來自 Open-Meteo；天氣為示範情境，實際以出發當日之逐時預報與現場風雨為準。',
+ todayTerm:"今日節氣", yiChar:"宜", jiChar:"忌",
+ emptyRoute:"打字搜尋地點、從清單挑選加入（或點熱門騎點）；湊滿兩點、設好出發時間與停留，按「開始分析」讀今天這條路線的天時。",
+ statusGood:"今日宜騎", statusWarn:"可騎 · 留意時段", statusRisk:"審慎 · 有挑戰路段",
+ wind_head:"頂風", wind_tail:"順風", wind_cross:"側風",
+ wxTS:"雷陣雨", wxShwr:"陣雨機率高", wxCloudy:"多雲時陰", wxFair:"多雲到晴",
+ wxDemo:"示範情境", wxOM:"Open-Meteo（CWA 備援）", wxCwa:l=>`CWA 鄉鎮逐3小時（${l}等）`,
+ daysLate:d=>` <span style="color:var(--risk)">(+${d}日)</span>`,
+ worstLine:(n,tm,cd,rain,uv,temp,wind,mg)=>`${n}於 <b>${tm}</b> 抵達，正逢${cd}（降雨 ${rain}%）、UV ${uv}、氣溫 ${temp}°`+(wind?`、${tx('wind_'+wind.kind)} ${wind.spd} km/h`:"")+(mg?`，且抵達前路段最陡 ${mg}%`:"")+`，為全程最具挑戰的一段。`,
+ headsLine:a=>a.join("、")+" 頂風", noHead:"全程無明顯逆風",
+ recChallenge:(tm,n)=>`挑戰集中在 <b>${tm} 的${n}</b>。可試著 <b>提早出發</b>、<b>縮短每點停留</b>，或 <b>反轉方向</b>，把最具挑戰路段的抵達時刻挪開午後對流。`,
+ recOk:(nm,vs)=>`目前排程的節奏尚可；若要更保險，把暴露路段的抵達時刻壓在午前最穩妥。出發日${nm}，${vs}`,
+ implausible:km=>`⚠ 路線總距離偏大（約 ${km} km），可能有地名被定位到錯誤位置。請在可疑地名後加上縣市或鄰近大地標，再查一次。`,
+ routeSub:(n,km,up,nm,wx)=>`${n} 點 · 約 ${km} km · 爬升 ~${up} m · 出發日${nm} · 天氣：${wx}`,
+ vkChallenge:"最具挑戰 時段/地點", vkWind:"風向", vkArrive:"抵達終點",
+ segEst:"直線推估",
+ segGrade:(a,m)=>` · 均坡 ${a}% · 最陡(連續300m) ${m}`,
+ segRepaired:n=>` <span class="seg-est">已依路名修正 ${n} 段隧道／橋樑高程</span>`,
+ segArtifact:' <span class="seg-est">已濾除疑似隧道／峽谷之高程假訊</span>',
+ segNoisy:' <span class="seg-est">海拔資料疑受峽谷／隧道影響</span>',
+ gradeComp:"坡度組成", gradeTitle:"坡度＝每前進100公尺的高度變化比例",
+ bands:{flat:"平路",gentle:"緩坡",steep:"陡坡",vsteep:"很陡",extreme:"極陡",down:"下坡",downS:"陡降"},
+ bandTips:{flat:"平路：坡度 ±2% 以內",gentle:"緩坡：爬坡 2–5%",steep:"陡坡：爬坡 5–8%",vsteep:"很陡：爬坡 8–12%",extreme:"極陡：爬坡逾 12%",down:"下坡：−2% 〜 −8%",downS:"陡降：坡度低於 −8%"},
+ mainClimb:(km,g,a)=>`主爬坡 ${km} km ↑${g}m（均 ${a}%）`,
+ gwHead:"⚠ 陡坡提醒：", gwJoin:"；", gwMain:(km,a,g)=>`主爬坡 ${km} 公里平均 <b>${a}%</b>（爬升 ${g}m）`,
+ gwMax:m=>`連續 300 公尺最陡達 <b>${m}%</b>`, gwTail:"，宜預留體力、提早降檔", gwDown:"；下坡段請控制車速",
+ segGap:(e,n,g)=>` <span class="seg-est">路網可騎至約 ${e}m；至${n}尚有 ~${g}m 爬升屬步道／扛車段</span>`,
+ steps:n=>`逐步指示（${n}）`,
+ regime:"⚑ 遮蔽 → 暴露：離開遮蔽地形，進入開闊／濱海／高地，風雨自此見真章",
+ retreatRt:(st,md,km,hd)=>`轉進機會：${st}（${md} ${km} km）${hd?" · 距離偏遠":""}`,
+ rtRoad:"路網", rtEst:"估",
+ retreatEsc:(st,km)=>`轉進機會：${st}${km?`（${km} km）`:""}`,
+ staType:{"台鐵":"台鐵","捷運":"捷運"}, staFmt:(ty,nm)=>`${ty} ${nm}站`,
+ ldPlaces:"查詢地點中…", ldElev:"整理海拔中…", ldWx:"取得逐時天氣中…", ldRetreat:"計算各點撤退車站中…",
+ ldWxDate:"依出發日期重取天氣中…",
+ ldRouteAll:n=>`並行規劃 ${n} 段路徑中…（失敗自動重試）`, ldRoute:(i,n,a,b)=>`規劃路徑 ${i} / ${n}：${a} → ${b}`,
+ ldLocate:(i,n,nm)=>`定位 ${i} / ${n}：${nm}`,
+ liveReal:"路徑、距離與坡度皆依真實路網計算", livePart:"部分路段為直線推估（路網服務未回應）",
+ liveNoKey:"目前為直線推估模式 — 部署 ORS_API_KEY 後即為真實路網",
+ liveAt:h=>` · 本次計算於 ${h}，每次查詢皆重新取得路網、坡度與天氣`,
+ errFn:"無法連線 AI 解析服務 — 請確認已部署 Netlify Functions",
+ errDeploy:"AI 解析服務未部署 — 請依 README 部署 Functions 並設定 ANTHROPIC_API_KEY",
+ errFmt:"AI 回應格式異常", errNone:"AI 沒有從文字中讀出地點，換段文字試試",
+ aiMissed:a=>"認得但定不了位、已略過："+a.join("、"), aiOk:n=>`已讀出 ${n} 個地點`,
+ escHere:"（即在此）", escPending:"—（附近車站待接 TDX）",
+ tagSpot:"騎點", tagPlace:"地名",
+ sugMore:"查詢更多地點…", sugErr:"外部地名查詢無回應，僅顯示內建騎點與車站", sugNone:"找不到相符地點，換個關鍵字試試",
+ ldSupply:"蒐集沿線補給點中…", supplyK:"補給", supStore:"超商", supWater:"飲水", supToilet:"公廁",
+ supGap:g=>`最長 ${g} km 無補給`, supNone:"沿線無補給點", supFail:"⚠ 補給點查詢未回應（來源忙碌），本次結果不含補給資訊",
+ detourWarn:(nm,km)=>`⚠ 「${nm}」偏離走廊，造成約 +${km} km 繞行——點該路點籤可在地圖檢視位置，確認或移除後重新分析。`,
+ errAnalyze:m=>`⚠ 分析中斷：${m}。請重新整理後再試；若重複發生，請將本訊息截圖回報。`, orGpx:"或上傳 GPX / KML", gpxPick:"選擇 GPX / KML 檔", ldGpx:"解析 GPX 軌跡中…",
+ gpxLoaded:(n,km,m)=>`已讀入軌跡 ${km} km（${n} 點）· 途經點 ${m} 個——設好時間後按「開始分析」`,
+ gpxBad:"讀不懂這個檔案（需為含 trk／rte 的 GPX，或含路線的 KML）", gpxEleFail:"軌跡缺少海拔且補齊未成——請改用含海拔的 GPX",
+ gpxRte:n=>`已讀入 ${n} 個路點（稀疏 rte，將依路網重新導航）`,
+ liveGpx:"路徑、距離與坡度依上傳之 GPX 軌跡計算", wpStart:"起點", wpEnd:"終點",
+ wpVia:(i,km)=>`途中 ${i} · ${km} km`, goBtn:"開始分析", goNeed:"湊滿兩個以上路點，即可開始分析", goHint:"路點已變更——按「開始分析」重新計算", snapBtn:"還原上次分析", snapOffline:"離線模式", snapRestored:t=>`已還原 ${t} 的分析結果（路網、坡度與天氣為當時資料；按「開始分析」可重新取得）`,
+ gpxFile:"騎行路線.gpx"
+},
+en:{
+ title:"Xiaobu Roadbook · Brompton route & weather",
+ mastSub:"Fold out, ride on — read the line through the day, and the season",
+ panelK:"Today's ride · Paste a whole trip, AI reads out the waypoints",
+ phTrip:"Paste a route description, travel notes, or a list of places, e.g. Start at Hualien Station, via Qixingtan, Xincheng Old Street, into Taroko to Tianxiang…",
+ aiBtn:"Parse route with AI", aiBusy:"AI parsing…",
+ orPick:"or pick one by one",
+ phWp:"Type a place name, e.g. 淡水, 太魯閣, Hualien Station… then pick from the list",
+ clearBtn:"Clear route",
+ hint:"Every waypoint is picked from a list with verified coordinates, so names are never misread or mislocated.",
+ ctlDate:"Date", ctlTime:"Start", ctlDwell:"Stop per point", unitMin:"min",
+ revOff:"Reverse direction ⇄", revOn:"Direction reversed ⇄",
+ noteLive:"Routes, grades and bail-outs use the real road network; weather uses CWA township 3-hourly forecasts (falls back to Open-Meteo / demo when no key or out of range — source always shown).",
+ disclaim:"⚠ Routes, grades and weather are <b>estimates</b>: real conditions vary greatly with roads, terrain and season. This analysis is for planning only — check conditions and official forecasts before and during your ride, and ride at your own risk.",
+ gpxBtn:"Download GPX", gmapsBtn:"Open in Google Maps",
+ lg_yi:'<i style="background:var(--good)"></i>Good', lg_warn:'<i style="background:var(--warn)"></i>Caution', lg_risk:'<i style="background:var(--risk)"></i>Care',
+ lg_note:"Headwind = riding into the wind · Tailwind = wind at your back · Bail-out = nearest station retreat",
+ bandsK:"Grade bands (elevation change per 100 m travelled)",
+ bl_flat:'<i style="background:#5FA046"></i>Flat ±2%', bl_gentle:'<i style="background:#B08A3E"></i>Gentle 2–5%',
+ bl_steep:'<i style="background:#CE8418"></i>Steep 5–8%', bl_vsteep:'<i style="background:#BE5027"></i>V-steep 8–12%',
+ bl_extreme:'<i style="background:#8C2318"></i>Extreme >12%', bl_down:'<i style="background:#8FA0B5"></i>Down −2〜−8%',
+ bl_downS:'<i style="background:#4A6076"></i>Steep down <−8%',
+ mSummary:"How are these times computed? — calibrated on 834 real rides",
+ mBody:"<p>Arrival times here are not theoretical. They are calibrated from 939 rides the owner actually completed on a Brompton between 2018–2026, recorded on Komoot. After removing non-cycling activities, rides under 3 km, and files without timestamps, <b>834 rides remain — about 31,790 km and 6.2 million track points</b>.</p><p>Each track first gets elevation cleaning: a ±100 m median filter along the line removes spikes, then 30 m resampling and a ±60 m moving average smooth the profile; grade is taken over a ±50 m window, and every short segment is assigned to one of seven bands — steep descent (≤−8%), downhill, flat (−2〜2%), gentle, steep, very steep, extreme (&gt;12%).</p><p>After excluding near-standstill samples (&lt;1.5 km/h), GPS spikes (&gt;80 km/h) and recording gaps (bridged segments with ≥10 s between points), each band uses <b>effective speed = Σdistance ÷ Σmoving time</b> — not average cruising speed: slow stretches are weighted by time, which is exactly what an arrival time needs. Samples favour the last 24 months, falling back to the full library where thin.</p><p>Cross-check: the library-wide flat effective speed of 16.3 km/h almost exactly matches 16.2 measured independently on a single ride that passed a 3-minute arrival-time test; climbing bands corroborate each other likewise. The one exception is the extreme band — only 29 km of noisy samples — so a conservative value is used. Band values are in the footer; stop time per waypoint is entered above and never mixed into pace.</p>",
+ colophon:'<b>小布路書</b> · Xiaobu Roadbook — a Brompton Roadbook (formerly “A Cyclist’s Almanac”) · Version <b>v2.6.3</b> (2026-09-10)<br>© 2026 Chang Chun-Yen · HEALS Design · All rights reserved<br>Routes, grades and weather are estimates for reference only; assess riding safety yourself.<br>Fallback route length = straight-line × 1.3; climb = elevation gap + per-km undulation. ETA uses graded pace (flat 16.3 · gentle 12 · steep 8.2 · v-steep 6.6 · extreme 4.5 · down 21.2 · steep-down 19.7 km/h, effective speeds calibrated on 834 Komoot rides 2024–2026) plus stop time per waypoint; head/tailwind from segment bearing vs. hourly wind.<br>Geocoding by Open-Meteo Geocoding & OpenStreetMap Nominatim; elevation by Open-Meteo. Demo weather is illustrative — trust the day’s forecast and conditions on the road.',
+ todayTerm:"Today's solar term", yiChar:"Do", jiChar:"Skip",
+ emptyRoute:"Type to search and pick places (or tap a popular spot); with two or more set, choose your start time and stops, then press Analyze.",
+ statusGood:"A good day to ride", statusWarn:"Rideable · mind the timing", statusRisk:"Ride with care · challenging section",
+ wind_head:"Headwind", wind_tail:"Tailwind", wind_cross:"Crosswind",
+ wxTS:"thunderstorms", wxShwr:"likely showers", wxCloudy:"mostly cloudy", wxFair:"partly sunny",
+ wxDemo:"demo scenario", wxOM:"Open-Meteo (CWA fallback)", wxCwa:l=>`CWA township 3-hourly (${l} etc.)`,
+ daysLate:d=>` <span style="color:var(--risk)">(+${d}d)</span>`,
+ worstLine:(n,tm,cd,rain,uv,temp,wind,mg)=>`${n} at <b>${tm}</b> meets ${cd} (rain ${rain}%), UV ${uv}, ${temp}°`+(wind?`, ${tx('wind_'+wind.kind).toLowerCase()} ${wind.spd} km/h`:"")+(mg?`, with grades up to ${mg}% just before`:"")+` — the most demanding stretch of the day.`,
+ headsLine:a=>"Headwind at "+a.join(", "), noHead:"No significant headwind",
+ recChallenge:(tm,n)=>`The challenge concentrates at <b>${n}, ${tm}</b>. Try <b>starting earlier</b>, <b>shortening stops</b>, or <b>reversing direction</b> to move that arrival away from afternoon convection.`,
+ recOk:(nm,vs)=>`The schedule looks reasonable; to be safe, land the exposed stretches before noon. Departing on ${nm} — ${vs}`,
+ implausible:km=>`⚠ Total distance looks too large (~${km} km) — a place may be mislocated. Add a county/city or nearby landmark after the doubtful name and search again.`,
+ routeSub:(n,km,up,nm,wx)=>`${n} stops · ~${km} km · climb ~${up} m · departing on ${nm} · weather: ${wx}`,
+ vkChallenge:"Toughest time/place", vkWind:"Wind", vkArrive:"Finish",
+ segEst:"straight-line estimate",
+ segGrade:(a,m)=>` · avg ${a}% · steepest (300 m) ${m}`,
+ segRepaired:n=>` <span class="seg-est">${n} tunnel/bridge section(s) corrected by road name</span>`,
+ segArtifact:' <span class="seg-est">suspected tunnel/canyon elevation artifacts filtered</span>',
+ segNoisy:' <span class="seg-est">elevation may be affected by canyon/tunnel</span>',
+ gradeComp:"Grade mix", gradeTitle:"Grade = elevation change per 100 m travelled",
+ bands:{flat:"Flat",gentle:"Gentle",steep:"Steep",vsteep:"V-steep",extreme:"Extreme",down:"Down",downS:"Steep down"},
+ bandTips:{flat:"Flat: within ±2%",gentle:"Gentle: 2–5% climb",steep:"Steep: 5–8% climb",vsteep:"Very steep: 8–12% climb",extreme:"Extreme: over 12%",down:"Downhill: −2% to −8%",downS:"Steep descent: below −8%"},
+ mainClimb:(km,g,a)=>`Main climb ${km} km ↑${g}m (avg ${a}%)`,
+ gwHead:"⚠ Grade alert: ", gwJoin:"; ", gwMain:(km,a,g)=>`main climb ${km} km averaging <b>${a}%</b> (↑${g}m)`,
+ gwMax:m=>`steepest 300 m reaches <b>${m}%</b>`, gwTail:" — pace yourself and shift early", gwDown:"; control your speed on the descents",
+ segGap:(e,n,g)=>` <span class="seg-est">rideable road ends near ${e}m; the last ~${g}m of climb to ${n} is trail / hike-a-bike</span>`,
+ steps:n=>`Turn-by-turn (${n})`,
+ regime:"⚑ Sheltered → exposed: leaving sheltered terrain for open / coastal / high ground — wind and rain get real from here",
+ retreatRt:(st,md,km,hd)=>`Bail-out: ${st} (${md} ${km} km)${hd?" · far":""}`,
+ rtRoad:"road", rtEst:"est.",
+ retreatEsc:(st,km)=>`Bail-out: ${st}${km?` (${km} km)`:""}`,
+ staType:{"台鐵":"TRA","捷運":"Metro"}, staFmt:(ty,nm)=>`${nm} Sta. (${ty})`,
+ ldPlaces:"Searching places…", ldElev:"Preparing elevations…", ldWx:"Fetching hourly weather…", ldRetreat:"Computing bail-out stations…",
+ ldWxDate:"Refetching weather for the new date…",
+ ldRouteAll:n=>`Routing ${n} legs in parallel… (auto-retry on failure)`, ldRoute:(i,n,a,b)=>`Routing ${i} / ${n}: ${a} → ${b}`,
+ ldLocate:(i,n,nm)=>`Locating ${i} / ${n}: ${nm}`,
+ liveReal:"Routes, distances and grades use the real road network", livePart:"Some legs are straight-line estimates (routing service unavailable)",
+ liveNoKey:"Straight-line estimate mode — deploy ORS_API_KEY for real road routing",
+ liveAt:h=>` · computed at ${h}; every query refetches routes, grades and weather`,
+ errFn:"Cannot reach the AI parsing service — check that Netlify Functions are deployed",
+ errDeploy:"AI parsing not deployed — deploy Functions per README and set ANTHROPIC_API_KEY",
+ errFmt:"Unexpected AI response format", errNone:"AI found no places in that text — try another passage",
+ aiMissed:a=>"Recognised but couldn't locate, skipped: "+a.join(", "), aiOk:n=>`Read ${n} places`,
+ escHere:" (right here)", escPending:"— (nearby stations pending TDX)",
+ tagSpot:"spot", tagPlace:"place",
+ sugMore:"Searching more places…", sugErr:"External geocoding unavailable — showing built-in spots and stations only", sugNone:"No matching place — try another keyword",
+ ldSupply:"Gathering supply points along the line…", supplyK:"Supplies", supStore:"Store", supWater:"Water", supToilet:"Toilet",
+ supGap:g=>`longest ${g} km without supplies`, supNone:"none on this leg", supFail:"⚠ Supply lookup did not respond (source busy) — this result has no supply info",
+ detourWarn:(nm,km)=>`⚠ “${nm}” sits off the corridor, adding ~${km} km of detour — tap its chip to inspect on the map, then confirm or remove and re-analyze.`,
+ errAnalyze:m=>`⚠ Analysis stopped: ${m}. Reload and retry; if it recurs, please report this message.`, orGpx:"or upload a GPX / KML", gpxPick:"Choose GPX / KML file", ldGpx:"Parsing GPX track…",
+ gpxLoaded:(n,km,m)=>`Track loaded: ${km} km (${n} pts) · ${m} waypoints — set your time, then press Analyze`,
+ gpxBad:"Could not read this file (needs a GPX with trk/rte, or a KML with a route)", gpxEleFail:"Track lacks elevation and backfill failed — please use a GPX with elevation",
+ gpxRte:n=>`Loaded ${n} route points (sparse rte — will be re-routed on the road network)`,
+ liveGpx:"Route, distance and grades follow the uploaded GPX track", wpStart:"Start", wpEnd:"Finish",
+ wpVia:(i,km)=>`Via ${i} · ${km} km`, goBtn:"Analyze", goNeed:"Add two or more waypoints to analyze", goHint:"Waypoints changed — press Analyze to recompute", snapBtn:"Restore last analysis", snapOffline:"offline", snapRestored:t=>`Restored the analysis from ${t} (routes, grades and weather as of then — press “Analyze” to refetch)`,
+ gpxFile:"brompton-route.gpx"
+},
+ja:{
+ title:"小布路書 · ブロンプトン ルートと天時",
+ mastSub:"折りたたんで、走り出す——一日と季節の線を読む",
+ panelK:"今日の走行 · 行程を貼るだけで、AIが経由地を読み取る",
+ phTrip:"ルートの説明・旅行記・地名リストを貼り付け。例：花蓮駅を出発、七星潭、新城老街、佳興小吃店を経て、太魯閣から天祥へ…",
+ aiBtn:"AIでルート解析", aiBusy:"AI解析中…",
+ orPick:"または一つずつ選ぶ",
+ phWp:"地名を入力（例：淡水、太魯閣、花蓮車站…）候補から選択",
+ clearBtn:"ルートを消去",
+ hint:"経由地はすべて候補リストから選ばれ、確定座標付き。地名の誤認・誤位置は起きません。",
+ ctlDate:"出発日", ctlTime:"時刻", ctlDwell:"各地点の滞在", unitMin:"分",
+ revOff:"方向を反転 ⇄", revOn:"反転済み ⇄",
+ noteLive:"ルート／勾配／退避は実路網で計算。天気は CWA 郷鎮3時間予報（キー未設定・範囲外は Open-Meteo／デモにフォールバック。出典は常に表示）",
+ disclaim:"⚠ ルート・勾配・天気はすべて<b>推定</b>です。実際の状況は道路・地形・季節で大きく変わります。本分析は計画の参考用であり、出発前後は現地の状況と公式予報を優先し、安全は自己責任でお願いします。",
+ gpxBtn:"GPX をダウンロード", gmapsBtn:"Google マップで開く",
+ lg_yi:'<i style="background:var(--good)"></i>宜', lg_warn:'<i style="background:var(--warn)"></i>注意', lg_risk:'<i style="background:var(--risk)"></i>慎重',
+ lg_note:"向かい風＝風に逆らう · 追い風＝風が押す · 退避＝最寄り駅へ離脱",
+ bandsK:"勾配区分（100 m 進むごとの高度変化）",
+ bl_flat:'<i style="background:#5FA046"></i>平坦 ±2%', bl_gentle:'<i style="background:#B08A3E"></i>緩坂 2–5%',
+ bl_steep:'<i style="background:#CE8418"></i>急坂 5–8%', bl_vsteep:'<i style="background:#BE5027"></i>激坂 8–12%',
+ bl_extreme:'<i style="background:#8C2318"></i>極坂 12%超', bl_down:'<i style="background:#8FA0B5"></i>下り −2〜−8%',
+ bl_downS:'<i style="background:#4A6076"></i>急降 −8%未満',
+ mSummary:"この到着時刻はどう計算？——実走834本による校正",
+ mBody:"<p>本サイトの到着時刻は理論値ではありません。オーナーが 2018–2026 年に Brompton で実際に完走し Komoot に記録した 939 本の走行から校正されています。自転車以外・3 km 未満・タイムスタンプ欠落を除き、<b>834 本・約 31,790 km・620 万トラックポイント</b>が残りました。</p><p>各トラックはまず標高クリーニング：沿線 ±100 m の中央値フィルタでスパイクを除去し、30 m ごとに再サンプル、±60 m 移動平均で平滑化。勾配は ±50 m 窓で取り、各区間を七つの帯——急降（≤−8%）・下り・平坦（−2〜2%）・緩坂・急坂・激坂・極坂（&gt;12%）——に振り分けます。</p><p>ほぼ静止（&lt;1.5 km/h）、GPS スパイク（&gt;80 km/h）、記録ギャップ（隣接点間 ≥10 秒のブリッジ区間）を除外した上で、各帯は<b>有効速度＝Σ距離 ÷ Σ移動時間</b>を採用——平均巡航速度ではありません。遅い区間ほど時間で重みが増し、それこそが「到着時刻」に必要な数字です。標本は直近 24 か月を主とし、不足帯は全期間で補完。</p><p>相互検証：全データの平坦有効速度 16.3 km/h は、独立した一本の実走で測られ沿線到着 3 分誤差の検証を通った 16.2 とほぼ一致。登坂帯も互いに整合します。唯一の例外は極坂帯（標本 29 km・ノイズ混入）で、保守値を採用。各帯の値はフッター参照。各地点の滞在時間は上の欄で別入力され、ペースには混ぜません。</p>",
+ colophon:'<b>小布路書</b> · ブロンプトン・ロードブック（旧「単車騎行農民暦」）· バージョン <b>v2.6.3</b>（2026-09-10）<br>© 2026 Chang Chun-Yen · HEALS Design · 無断転載を禁じます<br>ルート・勾配・天気は推定であり参考情報です。走行の安全はご自身で判断してください。<br>簡易時：距離＝直線 × 1.3、獲得標高＝標高差＋km あたり起伏。ETA は勾配別ペース（平坦16.3・緩坂12・急坂8.2・激坂6.6・極坂4.5・下り21.2・急降19.7 km/h、2024–2026 Komoot 実走834本の有効速度で校正）と各地点滞在から算出。向かい風／追い風は区間方位と毎時風向の差。<br>地名は Open-Meteo Geocoding と OpenStreetMap Nominatim、標高は Open-Meteo。デモ天気は例示であり、当日の予報と現地の風雨を優先してください。',
+ todayTerm:"今日の節気", yiChar:"宜", jiChar:"忌",
+ emptyRoute:"地名を入力して候補から追加（人気スポットのタップでも可）。2 地点以上そろえ、出発時刻と滞在を設定したら「分析開始」で天時を読みます。",
+ statusGood:"本日、走るに宜し", statusWarn:"走行可 · 時間帯に注意", statusRisk:"慎重に · 難所あり",
+ wind_head:"向かい風", wind_tail:"追い風", wind_cross:"横風",
+ wxTS:"雷雨", wxShwr:"にわか雨の可能性大", wxCloudy:"曇りがち", wxFair:"晴れ間あり",
+ wxDemo:"デモシナリオ", wxOM:"Open-Meteo（CWA代替）", wxCwa:l=>`CWA 郷鎮3時間予報（${l}など）`,
+ daysLate:d=>` <span style="color:var(--risk)">(+${d}日)</span>`,
+ worstLine:(n,tm,cd,rain,uv,temp,wind,mg)=>`${n}に <b>${tm}</b> 到着。ちょうど${cd}（降水 ${rain}%）、UV ${uv}、気温 ${temp}°`+(wind?`、${tx('wind_'+wind.kind)} ${wind.spd} km/h`:"")+(mg?`、直前区間の最大勾配 ${mg}%`:"")+`——本日いちばんの難所です。`,
+ headsLine:a=>a.join("、")+" で向かい風", noHead:"全行程で目立つ向かい風なし",
+ recChallenge:(tm,n)=>`難所は <b>${tm} の${n}</b> に集中。<b>早出</b>、<b>滞在短縮</b>、<b>方向反転</b>で、到着を午後の対流から外しましょう。`,
+ recOk:(nm,vs)=>`現在のペース配分は良好。より安全には、露出区間の到着を午前中に。出発日は${nm}——${vs}`,
+ implausible:km=>`⚠ 総距離が大きすぎます（約 ${km} km）。地名が誤位置の可能性——疑わしい地名に県市や大きな目印を添えて再検索してください。`,
+ routeSub:(n,km,up,nm,wx)=>`${n} 地点 · 約 ${km} km · 獲得 ~${up} m · 出発日 ${nm} · 天気：${wx}`,
+ vkChallenge:"最難の時刻/地点", vkWind:"風", vkArrive:"ゴール",
+ segEst:"直線推定",
+ segGrade:(a,m)=>` · 平均 ${a}% · 最急(連続300m) ${m}`,
+ segRepaired:n=>` <span class="seg-est">道路名によりトンネル／橋 ${n} 区間の標高を補正</span>`,
+ segArtifact:' <span class="seg-est">トンネル／峡谷由来と思われる標高ノイズを除去</span>',
+ segNoisy:' <span class="seg-est">標高データに峡谷／トンネルの影響の疑い</span>',
+ gradeComp:"勾配構成", gradeTitle:"勾配＝100 m 進むごとの高度変化率",
+ bands:{flat:"平坦",gentle:"緩坂",steep:"急坂",vsteep:"激坂",extreme:"極坂",down:"下り",downS:"急降"},
+ bandTips:{flat:"平坦：±2% 以内",gentle:"緩坂：2–5%",steep:"急坂：5–8%",vsteep:"激坂：8–12%",extreme:"極坂：12% 超",down:"下り：−2%〜−8%",downS:"急降：−8% 未満"},
+ mainClimb:(km,g,a)=>`主登坂 ${km} km ↑${g}m（平均 ${a}%）`,
+ gwHead:"⚠ 急勾配注意：", gwJoin:"；", gwMain:(km,a,g)=>`主登坂 ${km} km 平均 <b>${a}%</b>（↑${g}m）`,
+ gwMax:m=>`連続 300 m の最大勾配 <b>${m}%</b>`, gwTail:"。体力を温存し早めのシフトを", gwDown:"。下りは速度を抑えて",
+ segGap:(e,n,g)=>` <span class="seg-est">車道は約 ${e}m 地点まで。${n}までの残り ~${g}m は徒歩／担ぎ区間</span>`,
+ steps:n=>`ターンバイターン（${n}）`,
+ regime:"⚑ 遮蔽 → 露出：遮られた地形を抜け、開けた／海沿い／高所へ。風雨はここから本番",
+ retreatRt:(st,md,km,hd)=>`退避：${st}（${md} ${km} km）${hd?" · やや遠い":""}`,
+ rtRoad:"路網", rtEst:"推定",
+ retreatEsc:(st,km)=>`退避：${st}${km?`（${km} km）`:""}`,
+ staType:{"台鐵":"台鉄","捷運":"MRT"}, staFmt:(ty,nm)=>`${ty} ${nm}駅`,
+ ldPlaces:"地点を検索中…", ldElev:"標高を整理中…", ldWx:"毎時天気を取得中…", ldRetreat:"各地点の退避駅を計算中…",
+ ldWxDate:"出発日で天気を再取得中…",
+ ldRouteAll:n=>`${n} 区間を並列でルート計算中…（失敗時は自動再試行）`, ldRoute:(i,n,a,b)=>`ルート計算 ${i} / ${n}：${a} → ${b}`,
+ ldLocate:(i,n,nm)=>`位置特定 ${i} / ${n}：${nm}`,
+ liveReal:"ルート・距離・勾配は実路網で計算", livePart:"一部区間は直線推定（路網サービス無応答）",
+ liveNoKey:"直線推定モード — ORS_API_KEY を設定すると実路網に",
+ liveAt:h=>` · 計算時刻 ${h}。照会のたびに路網・勾配・天気を再取得`,
+ errFn:"AI 解析サービスに接続できません — Netlify Functions の配備を確認",
+ errDeploy:"AI 解析が未配備 — README に従い Functions と ANTHROPIC_API_KEY を設定",
+ errFmt:"AI 応答の形式が不正", errNone:"AI が地名を読み取れませんでした。別の文章でお試しを",
+ aiMissed:a=>"認識したが位置特定できずスキップ："+a.join("、"), aiOk:n=>`${n} 地点を読み取りました`,
+ escHere:"（当地）", escPending:"—（近隣駅は TDX 接続待ち）",
+ tagSpot:"スポット", tagPlace:"地点",
+ sugMore:"さらに検索中…", sugErr:"外部地名検索が無応答 — 内蔵スポットと駅のみ表示", sugNone:"該当なし — 別のキーワードでお試しを",
+ ldSupply:"沿線の補給ポイントを収集中…", supplyK:"補給", supStore:"コンビニ", supWater:"給水", supToilet:"トイレ",
+ supGap:g=>`最長 ${g} km 補給なし`, supNone:"この区間に補給なし", supFail:"⚠ 補給検索が応答せず（サーバ混雑）——今回の結果に補給情報は含まれません",
+ detourWarn:(nm,km)=>`⚠ 「${nm}」がコースから外れ、約 +${km} km の迂回に——チップをタップして地図で確認し、修正・削除のうえ再分析を。`,
+ errAnalyze:m=>`⚠ 分析が中断：${m}。再読み込みして再試行を。繰り返す場合はこのメッセージをご報告ください。`, orGpx:"または GPX / KML をアップロード", gpxPick:"GPX / KML ファイルを選択", ldGpx:"GPX トラックを解析中…",
+ gpxLoaded:(n,km,m)=>`トラック読込：${km} km（${n} 点）· 経由点 ${m} 個——時刻を設定して「分析開始」を`,
+ gpxBad:"このファイルを読めません（trk／rte を含む GPX、または経路を含む KML が必要）", gpxEleFail:"標高がなく補完も失敗——標高付き GPX をご利用ください",
+ gpxRte:n=>`${n} 個のルートポイントを読込（疎な rte のため路網で再ルーティング）`,
+ liveGpx:"ルート・距離・勾配はアップロードされた GPX トラックに基づきます", wpStart:"スタート", wpEnd:"ゴール",
+ wpVia:(i,km)=>`経由 ${i} · ${km} km`, goBtn:"分析開始", goNeed:"2 地点以上そろえば分析できます", goHint:"地点が変更されました——「分析開始」で再計算", snapBtn:"前回の分析を復元", snapOffline:"オフライン", snapRestored:t=>`${t} の分析結果を復元しました（路網・勾配・天気は当時のデータ。「分析開始」で再取得）`,
+ gpxFile:"brompton-route.gpx"
+}};
+const TERMS_L={
+en:{
+"立春":{n:"Start of Spring",yi:["Short warm-up rides","Easy riverside spins"],ji:["Overreaching epics"],v:"Wheels not yet warm — build the legs first."},
+"雨水":{n:"Rain Water",yi:["Ride the rain breaks","Slow city loops"],ji:["Hard braking in rain","Speeding downhill"],v:"Wet roads ride like thin ice — slow beats sorry."},
+"驚蟄":{n:"Awakening of Insects",yi:["First long rides","Visit spring gardens"],ji:["Cold starts, no warm-up"],v:"The body has thawed; the heart should head out too."},
+"春分":{n:"Spring Equinox",yi:["All-day distance","Ride with company"],ji:["Nothing to avoid"],v:"Day and night in balance — ride the middle way."},
+"清明":{n:"Clear and Bright",yi:["Multi-day tours","Old trails and family visits"],ji:["Wasting this fine spell"],v:"If not a long tour now, then when?"},
+"穀雨":{n:"Grain Rain",yi:["Tung blossoms in the hills","Beat the coming rains"],ji:["Ignoring afternoon storms"],v:"Catch the last dry days before the plum rains."},
+"立夏":{n:"Start of Summer",yi:["Dawn departures","Carry rain gear"],ji:["Midday sun exposure"],v:"Summer's gate is open — the season of racing the rain."},
+"小滿":{n:"Grain Buds",yi:["Short rides in rain windows","Watch the rivers"],ji:["Low creekside roads before storms"],v:"Ride before the waters fill; turn home as they rise."},
+"芒種":{n:"Grain in Ear",yi:["Ride both ends of the day","Flame trees in bloom"],ji:["Noon on open levees"],v:"When the sun turns fierce, retreat to dawn and dusk."},
+"夏至":{n:"Summer Solstice",yi:["Earliest starts","Use the long light"],ji:["Afternoon exposure"],v:"Longest day, shortest shadow — ride where the sun is not."},
+"小暑":{n:"Minor Heat",yi:["Watch the typhoons","Seize the clear windows"],ji:["Heading out as storms close in"],v:"Read the sky — and the forecast more."},
+"大暑":{n:"Major Heat",yi:["Out by first light","Climb to cooler air (Wuling)"],ji:["Lowland noon"],v:"The plains are a furnace — take the bike uphill."},
+"立秋":{n:"Start of Autumn",yi:["Between-typhoon windows","Cool evening rides"],ji:["Rivers before and after typhoons"],v:"Autumn in name; heat and typhoons remain."},
+"處暑":{n:"End of Heat",yi:["Dusk rides","Riverside cool-downs"],ji:["Trusting 'autumn' under full sun"],v:"The heat is leaving; coolness waits in line."},
+"白露":{n:"White Dew",yi:["Misty riverside mornings","Add thin long sleeves"],ji:["Underdressing for the chill"],v:"The dew has whitened — give your arms a layer."},
+"秋分":{n:"Autumn Equinox",yi:["Long tours","Far rides with friends"],ji:["Missing this clear spell"],v:"Before the winds rise, ride the far roads full."},
+"寒露":{n:"Cold Dew",yi:["Leeward routes","Ride toward the sun"],ji:["Grinding into headwinds"],v:"The northeast wind is here — choose sheltered roads."},
+"霜降":{n:"Frost's Descent",yi:["Warm midday hours","Pack a windbreaker"],ji:["Cold dawn headwinds"],v:"The wind has an edge — ride the warm hours."},
+"立冬":{n:"Start of Winter",yi:["Seize the sunny days","Layer up"],ji:["Wet cold headwind epics"],v:"Winter's door is closing — ride while it shines."},
+"小雪":{n:"Minor Snow",yi:["Sunny river stretches","Short warm-ups"],ji:["Cold rain and headwinds"],v:"No snow here — only the wet and the wind."},
+"大雪":{n:"Major Snow",yi:["Short rides in clear windows","Finish with something warm"],ji:["Long rides into the cold"],v:"Between the name and the fact lies Taiwan's humour."},
+"冬至":{n:"Winter Solstice",yi:["Short rides, early returns","Tangyuan afterwards"],ji:["Riding home in the dark"],v:"Shortest day — home early, warm early."},
+"小寒":{n:"Minor Cold",yi:["Chase the sun south","Warm rides in Taitung"],ji:["Cold-front headwinds"],v:"When the north turns cold, point the bars south."},
+"大寒":{n:"Major Cold",yi:["Southbound for warmth","Sun-chasing in Taitung"],ji:["Cold snaps on high ground"],v:"The coldest square — and the eve of the wheel turning back to spring."}
+},
+ja:{
+"立春":{n:"立春",yi:["短めのウォームアップ","河川敷をゆるく"],ji:["無理な遠征"],v:"車輪より先に、脚を温めよ。"},
+"雨水":{n:"雨水",yi:["雨の切れ間に出る","市街をゆっくり"],ji:["雨中の急ブレーキ","下りの飛ばしすぎ"],v:"濡れた路面は薄氷。急がば緩めよ。"},
+"驚蟄":{n:"啓蟄",yi:["解凍のロングライド","春の庭園めぐり"],ji:["体が冷えたままの朝出"],v:"体が解けたら、心も外へ。"},
+"春分":{n:"春分",yi:["終日のロングライド","仲間と走る"],ji:["忌なし"],v:"昼夜半ば、道もほどよく。"},
+"清明":{n:"清明",yi:["数日の縦走","古道めぐりと墓参"],ji:["この晴天を無駄に"],v:"いま縦走せずして、いつ走る。"},
+"穀雨":{n:"穀雨",yi:["山あいの桐の花見","雨の前に走り込む"],ji:["午後の雷雨を侮る"],v:"梅雨入り前の乾いた日を惜しめ。"},
+"立夏":{n:"立夏",yi:["早朝に出発","雨具を携行"],ji:["真昼の炎天走"],v:"夏の門は開いた。雨と競走の季節。"},
+"小滿":{n:"小満",yi:["雨の合間の短距離","河川敷で水を見る"],ji:["雷雨前の低地・川沿い"],v:"水満ちる前に走り、満ちなば帰る。"},
+"芒種":{n:"芒種",yi:["朝夕の二部走","鳳凰木の花見"],ji:["真昼の堤防道"],v:"日差しが牙をむけば、朝夕へ退く。"},
+"夏至":{n:"夏至",yi:["夜明け前に出る","長い日を使い切る"],ji:["午後の直射"],v:"日は最も長く、影は最も短し。日を避けて走れ。"},
+"小暑":{n:"小暑",yi:["台風情報を注視","晴れ間を逃さない"],ji:["荒天間際の出発"],v:"空を読むより、まず予報を読め。"},
+"大暑":{n:"大暑",yi:["夜明けとともに","山へ避暑（武嶺・中横）"],ji:["平地の正午"],v:"平地は竈。車輪ごと山へ上れ。"},
+"立秋":{n:"立秋",yi:["台風の間隙を突く","夕涼みライド"],ji:["台風前後の川沿い"],v:"秋は名のみ、暑さと台風は居座る。"},
+"處暑":{n:"処暑",yi:["黄昏ライド","河川敷で涼む"],ji:["秋と信じて炎天へ"],v:"暑気は退場、涼はまだ列の中。"},
+"白露":{n:"白露",yi:["朝霧の河川敷","薄手の長袖を"],ji:["薄着で涼を貪る"],v:"露白し。腕に一枚を足せ。"},
+"秋分":{n:"秋分",yi:["ロングツーリング","仲間と遠出"],ji:["この晴朗を逃す"],v:"風立つ前に、遠い道を走り尽くせ。"},
+"寒露":{n:"寒露",yi:["風下ルート","日向へ走る"],ji:["向かい風に力押し"],v:"風は北東より。道は風裏を選べ。"},
+"霜降":{n:"霜降",yi:["昼の暖かい時間に","ウインドブレーカーを"],ji:["寒暁の向かい風"],v:"風が鋭い。暖かい刻を選んで走れ。"},
+"立冬":{n:"立冬",yi:["晴れの日を逃さない","重ね着で"],ji:["湿冷の向かい風遠征"],v:"冬の戸は閉じかけ。晴れたら走れ。"},
+"小雪":{n:"小雪",yi:["日の当たる川沿い","短めに温まる"],ji:["冷雨と向かい風"],v:"ここに雪はなく、湿りと風のみ。"},
+"大雪":{n:"大雪",yi:["晴れ間に短く","温かい締めを"],ji:["欲張って冷える"],v:"名と実のあわい、それが台湾の妙。"},
+"冬至":{n:"冬至",yi:["短距離で早帰り","湯圓で温まる"],ji:["日暮れの遠帰り"],v:"日は最も短し。早く帰り、早く温まれ。"},
+"小寒":{n:"小寒",yi:["南へ日を追う","台東で温か走"],ji:["寒波の向かい風"],v:"北が冷えたら、ハンドルは南へ。"},
+"大寒":{n:"大寒",yi:["南部へ暖を求め","台東で日を追う"],ji:["寒波の高地"],v:"最も寒い一齣は、輪が春へ回る前夜。"}
+}};
+let LANG=(()=>{try{const s=localStorage.getItem('xb_lang');if(s&&I18N[s])return s;}catch(e){}
+ const n=(navigator.language||'').toLowerCase();return n.startsWith('zh')?'zh':n.startsWith('ja')?'ja':'en';})();
+const tx=k=>{const d=I18N[LANG]||I18N.zh;return (k in d)?d[k]:I18N.zh[k];};
+const tv=tt=>{if(LANG==='zh')return tt;const L=(TERMS_L[LANG]||{})[tt.name]||{};
+ return {name:L.n||tt.name,yi:L.yi||tt.yi,ji:L.ji||tt.ji,verse:L.v||tt.verse,season:tt.season};};
+function applyStatic(){
+ document.documentElement.lang = LANG==='zh'?'zh-Hant':LANG;
+ document.title = tx('title');
+ document.querySelectorAll('[data-i18n]').forEach(el=>{el.textContent=tx(el.dataset.i18n);});
+ document.querySelectorAll('[data-i18n-html]').forEach(el=>{el.innerHTML=tx(el.dataset.i18nHtml);});
+ document.querySelectorAll('[data-i18n-ph]').forEach(el=>{el.placeholder=tx(el.dataset.i18nPh);});
+ const rb=document.getElementById('revBtn'); if(rb) rb.textContent = REVERSED?tx('revOn'):tx('revOff');
+ const ab=document.getElementById('aiBtn'); if(ab){ ab.hidden=false; if(!ab.disabled) ab.textContent=tx('aiBtn'); }
+ try{ paintGo(); }catch(e){}
+ document.querySelectorAll('.lang-sw button').forEach(b=>b.classList.toggle('on',b.dataset.lang===LANG));
+}
+function setLang(l){ if(!I18N[l]||l===LANG) return; LANG=l;
+ try{localStorage.setItem('xb_lang',l);}catch(e){}
+ applyStatic(); renderToday(); renderWaypoints(); renderRoute(); }
+/* ================= /i18n ================= */
+const wxName=s=>!s?"":(typeof s==='string')?s:s.k==='cwa'?tx('wxCwa')(s.l):s.k==='om'?tx('wxOM'):tx('wxDemo');
+const staFmtRt=st=>(st&&st.ty)?tx('staFmt')(tx('staType')[st.ty]||st.ty,st.nm):st;
+
 let ANALYZE_SEQ=0;
+
+// ================= GPX 匯入 (v2.6) =================
+let GPXDATA=null;   // {track:[[lng,lat,ele],...], cum:[km...], wpts:[{n,lat,lng}], name}
+function xbParseGpx(xmlText){
+  const doc=new DOMParser().parseFromString(xmlText,'application/xml');
+  if(doc.querySelector('parsererror')) return null;
+  const num=(el,sel)=>{const c=el.querySelector(sel);const v=c?parseFloat(c.textContent):NaN;return isFinite(v)?v:null;};
+  if(doc.querySelector('kml')){
+    let track=[];
+    doc.querySelectorAll('LineString coordinates').forEach(c=>{
+      c.textContent.trim().split(/\s+/).forEach(tok=>{
+        const parts=tok.split(','), lng=+parts[0], lat=+parts[1], ele=+parts[2];
+        if(isFinite(lat)&&isFinite(lng)) track.push([lng,lat,isFinite(ele)?ele:null]);
+      });
+    });
+    if(track.length<2) return null;
+    const wpts=[...doc.querySelectorAll('Placemark')].filter(p=>p.querySelector('Point coordinates')).map(p=>{
+      const parts=p.querySelector('Point coordinates').textContent.trim().split(','),
+            lng=+parts[0], lat=+parts[1];
+      return {lat,lng,n:((p.querySelector('name')||{}).textContent||'').trim()};
+    }).filter(p=>isFinite(p.lat)&&p.n);
+    const name=(((doc.querySelector('Document > name')||{}).textContent)||'').trim();
+    if(track.length>2000){ const k=Math.ceil(track.length/2000);
+      const t2=track.filter((_,i)=>i%k===0);
+      if(t2[t2.length-1][0]!==track[track.length-1][0]) t2.push(track[track.length-1]);
+      track=t2; }
+    return {mode:'track', track, wpts, name};
+  }
+  let track=[];
+  doc.querySelectorAll('trk trkseg trkpt').forEach(p=>{
+    const lat=+p.getAttribute('lat'), lon=+p.getAttribute('lon');
+    if(isFinite(lat)&&isFinite(lon)) track.push([lon,lat,num(p,'ele')]);
+  });
+  if(track.length<2){
+    const rpts=[...doc.querySelectorAll('rte rtept')].map(p=>({lat:+p.getAttribute('lat'),lng:+p.getAttribute('lon'),
+      n:((p.querySelector('name')||{}).textContent||'').trim()})).filter(p=>isFinite(p.lat)&&isFinite(p.lng));
+    if(rpts.length>=20){ track=rpts.map(p=>[p.lng,p.lat,null]); }
+    else if(rpts.length>=2){ return {mode:'rte-sparse', rpts}; }
+    else return null;
+  }
+  const wpts=[...doc.querySelectorAll('wpt')].map(p=>({lat:+p.getAttribute('lat'),lng:+p.getAttribute('lon'),
+    n:((p.querySelector('name')||{}).textContent||'').trim()})).filter(p=>isFinite(p.lat)&&isFinite(p.lng)&&p.n);
+  const name=(((doc.querySelector('trk > name')||doc.querySelector('metadata > name')||{}).textContent)||'').trim();
+  if(track.length>2000){ const k=Math.ceil(track.length/2000);
+    const t2=track.filter((_,i)=>i%k===0);
+    if(t2[t2.length-1][0]!==track[track.length-1][0]) t2.push(track[track.length-1]);
+    track=t2; }
+  return {mode:'track', track, wpts, name};
+}
+function xbTrackCum(track){ const cum=[0];
+  for(let i=1;i<track.length;i++)
+    cum[i]=cum[i-1]+haversine({lat:track[i-1][1],lng:track[i-1][0]},{lat:track[i][1],lng:track[i][0]});
+  return cum;
+}
+function xbNearestOnTrack(track,cum,lat,lng){ let bi=0,bd=1e9;
+  for(let i=0;i<track.length;i++){ const d=haversine({lat:track[i][1],lng:track[i][0]},{lat,lng}); if(d<bd){bd=d;bi=i;} }
+  return {i:bi, d:bd, at:cum[bi]};
+}
+async function xbFillTrackEle(track){
+  for(let s=0;s<track.length;s+=100){
+    const ch=track.slice(s,s+100);
+    const r=await fetch('https://api.open-meteo.com/v1/elevation?latitude='+
+      ch.map(p=>p[1].toFixed(5)).join(',')+'&longitude='+ch.map(p=>p[0].toFixed(5)).join(','));
+    if(!r.ok) return false;
+    const j=await r.json(); if(!j.elevation||j.elevation.length!==ch.length) return false;
+    j.elevation.forEach((e,i)=>{ track[s+i][2]=e; });
+  }
+  return true;
+}
+function xbSnapNamed(lat,lng){
+  let best=null;
+  GAZ.forEach(g=>{const d=haversine({lat,lng},{lat:g.lat,lng:g.lng}); if(d<1.2&&(!best||d<best.d)) best={d,g};});
+  STATIONS.forEach(s=>{const d=haversine({lat,lng},{lat:s[1],lng:s[2]}); if(d<1.2&&(!best||d<best.d)) best={d,s};});
+  return best;
+}
+function xbGpxWaypoints(track,cum,gwpts){
+  const total=cum[cum.length-1];
+  const picks=[{i:0,name:null,tag:'start'}];
+  gwpts.forEach(w=>{ const p=xbNearestOnTrack(track,cum,w.lat,w.lng);
+    if(p.d<=0.5) picks.push({i:p.i, name:w.n, tag:'wpt'}); });
+  if(picks.length===1){
+    // 沿線地標優先:騎點庫與車站距軌跡 ≤1.2km 者作為里程碑
+    const named=[];
+    GAZ.forEach(g=>{ const p=xbNearestOnTrack(track,cum,g.lat,g.lng);
+      if(p.d<=1.2 && p.at>3 && p.at<total-3) named.push({i:p.i, name:g.n, tag:'gaz', at:p.at}); });
+    STATIONS.forEach(s=>{ const p=xbNearestOnTrack(track,cum,s[1],s[2]);
+      if(p.d<=1.0 && p.at>3 && p.at<total-3) named.push({i:p.i, name:s[0]+'站', tag:'sta', at:p.at}); });
+    named.sort((a,b)=>a.at-b.at);
+    let take=named;
+    if(take.length>6){ const k=Math.ceil(take.length/6); take=take.filter((_,ix)=>ix%k===0); }
+    take.forEach(p=>picks.push({i:p.i, name:p.name, tag:p.tag}));
+    if(take.length===0 && total>18){
+      const nvia=Math.min(5, Math.max(1, Math.floor(total/13)));
+      const step=total/(nvia+1);
+      for(let m=1;m<=nvia;m++){ const at=step*m;
+        let i=cum.findIndex(c=>c>=at); if(i<0) i=track.length-1;
+        picks.push({i, name:null, tag:'via'}); }
+    }
+  }
+  picks.push({i:track.length-1, name:null, tag:'end'});
+  picks.sort((a,b)=>a.i-b.i);
+  const out=[];
+  picks.forEach(p=>{ const prev=out[out.length-1];
+    if(prev && cum[p.i]-cum[prev.i]<2 && p.tag!=='end'){ if(p.name&&!prev.name){prev.i=p.i;prev.name=p.name;prev.tag=p.tag;} return; }
+    out.push(p); });
+  let viaN=0;
+  return out.map(p=>{
+    let nm=p.name;
+    const s=xbSnapNamed(track[p.i][1],track[p.i][0]);
+    if(!nm){
+      if(s&&s.g) nm=s.g.n; else if(s&&s.s) nm=s.s[0]+'站';
+      else nm = p.tag==='start'?tx('wpStart') : p.tag==='end'?tx('wpEnd') : tx('wpVia')(++viaN, cum[p.i].toFixed(0));
+    }
+    const t=track[p.i];
+    const w={n:nm, lat:t[1], lng:t[0], elev:(t[2]??null), wz:'basin',
+             esc:(s&&s.g&&s.g.esc)?s.g.esc:{st:tx('escPending'),km:0,hard:false}, src:'gpx'};
+    if(w.elev!==null) w.wz=inferZone(w);
+    return w;
+  });
+}
+function buildGpxSegs(){
+  const D=GPXDATA;
+  const wps = REVERSED ? [...WAYPOINTS].reverse() : WAYPOINTS.slice();
+  const track = REVERSED ? [...D.track].slice().reverse() : D.track;
+  const cum = xbTrackCum(track);
+  const idx = wps.map(w=>xbNearestOnTrack(track,cum,w.lat,w.lng).i);
+  const segs=[];
+  for(let k=1;k<wps.length;k++){
+    let a=idx[k-1], b=idx[k]; if(b<=a) b=Math.min(track.length-1,a+1);
+    const geom=track.slice(a,b+1).map(p=>[p[0],p[1],(p[2]??0)]);
+    let d=0;
+    for(let i=1;i<geom.length;i++)
+      d+=haversine({lat:geom[i-1][1],lng:geom[i-1][0]},{lat:geom[i][1],lng:geom[i][0]});
+    segs.push(buildSegFromRoute(geom, [], d, 0, 0));
+  }
+  return segs;
+}
 async function analyze(){
+  NEED_RUN=false;
+  try{ await analyzeCore(); }
+  catch(e){
+    console.error('[分析中斷]', e);
+    try{
+      const v=document.getElementById('view');
+      if(v) v.innerHTML='<p class="empty-note" style="color:var(--risk)">'+tx('errAnalyze')(String(e&&e.message||e))+'</p>';
+      paintGo();
+    }catch(e2){}
+  }
+}
+async function analyzeCore(){
   const seq=++ANALYZE_SEQ;
-  if(WAYPOINTS.length<2){ ROUTE=[]; SEGDATA=[]; renderRoute(); return; }
-  if(WAYPOINTS.some(w=>w.elev===null)){ showLoading("整理海拔中…"); await fillElevations(WAYPOINTS); }
+  if(WAYPOINTS.length<2){ ROUTE=[]; SEGDATA=[]; SUPPLY=[]; renderRoute(); renderMap(); paintSnapBar(); paintGo(); return; }
+  if(GPXDATA && GPXDATA.track && GPXDATA.track.length>=2){
+    showLoading(tx('ldGpx'));
+    ROUTE=WAYPOINTS.slice();
+    SEGDATA=buildGpxSegs();
+    const modeEl=document.getElementById('routeMode');
+    if(modeEl){ const st=new Date(), hm=String(st.getHours()).padStart(2,'0')+':'+String(st.getMinutes()).padStart(2,'0');
+      modeEl.textContent = tx('liveGpx') + tx('liveAt')(hm); }
+    if(seq!==ANALYZE_SEQ) return;
+  } else {
+  if(WAYPOINTS.some(w=>w.elev===null)){ showLoading(tx('ldElev')); await fillElevations(WAYPOINTS); }
   if(seq!==ANALYZE_SEQ) return;
   ROUTE=WAYPOINTS.slice();
   await routeAll();            if(seq!==ANALYZE_SEQ) return;
-  showLoading("計算各點撤退車站中…");
+  }
+  showLoading(tx('ldWx'));
+  await fetchWeather();        if(seq!==ANALYZE_SEQ) return;
+  showLoading(tx('ldRetreat'));
   await computeRetreats();     if(seq!==ANALYZE_SEQ) return;
+  showLoading(tx('ldSupply'));
+  await fetchSupply();         if(seq!==ANALYZE_SEQ) return;
   renderRoute();
   renderMap();
   const tools=document.getElementById('routeTools');
   tools.hidden = ROUTE.length<2;
+  document.getElementById('disclaim').hidden = ROUTE.length<2;
   document.getElementById('gmapsBtn').href=gmapsUrl();
+  saveSnap();
+  paintGo();
+  paintSnapBar();
 }
 
 // ================= real routing engine (ORS via /api/route), gradients, retreat, AI, map, GPX =================
@@ -863,74 +1599,239 @@ function estSegment(a,b){
            maxG:null, avgG:null, bands:null };
 }
 
-function gradesFromGeom(geom){
-  // geom: [[lng,lat,ele],...] → rolling ~100m gradient samples: [{d0,d1,g}]
+function gradesFromGeom(geom, repairs){
+  // geom: [[lng,lat,ele],...] → 去尖刺、重取樣、平滑後的坡度分析
+  // repairs: [{a,b,why}]（公尺）— 依路名辨識的隧道/橋樑區間，直接以兩端線性內插取代（DEM 在此量到的是山體/谷底，非路面）
   if(!geom || geom.length<3) return null;
-  const pts=[]; let cum=0;
+  const raw=[]; let cum=0;
   for(let i=0;i<geom.length;i++){
     if(i>0) cum += haversine({lat:geom[i-1][1],lng:geom[i-1][0]},{lat:geom[i][1],lng:geom[i][0]})*1000;
-    pts.push({d:cum, e:geom[i][2]||0});
+    raw.push({d:cum, e:geom[i][2]||0});
   }
-  const total=cum; if(total<50) return null;
-  const eleAt=(d)=>{                       // linear interpolation along the profile
-    if(d<=0) return pts[0].e;
-    if(d>=total) return pts[pts.length-1].e;
-    let lo=0, hi=pts.length-1;
-    while(hi-lo>1){ const m=(lo+hi)>>1; (pts[m].d<=d)?lo=m:hi=m; }
-    const a=pts[lo], b=pts[hi], f=(d-a.d)/Math.max(1e-6,b.d-a.d);
+  const total=cum; if(total<80) return null;
+  let repaired=0;
+  (repairs||[]).forEach(r=>{
+    const a=Math.max(0,Math.min(total,r.a)), b=Math.max(0,Math.min(total,r.b));
+    if(b-a<40) return;
+    const at=d=>{ let lo=0,hi=raw.length-1;
+      while(hi-lo>1){const m=(lo+hi)>>1;(raw[m].d<=d)?lo=m:hi=m;}
+      const p=raw[lo],q=raw[hi],f=(d-p.d)/Math.max(1e-6,q.d-p.d); return p.e+(q.e-p.e)*f; };
+    const eA=at(Math.max(0,a-15)), eB=at(Math.min(total,b+15));
+    raw.forEach(p=>{ if(p.d>a&&p.d<b) p.e=eA+(eB-eA)*(p.d-a)/(b-a); });
+    repaired++;
+  });
+  // 1) 去尖刺：距離式中位數濾波（±100m 內取中位，處理副本），可吃掉寬達 ~200m 的橋樑／峽谷壁假訊
+  const med=(arr)=>{const s=[...arr].sort((a,b)=>a-b);return s[(s.length-1)>>1];};
+  const cp=raw.map((p,i)=>{
+    const w=[]; let j=i;
+    while(j>=0 && p.d-raw[j].d<=100){ w.push(raw[j].e); j--; }
+    j=i+1;
+    while(j<raw.length && raw[j].d-p.d<=100){ w.push(raw[j].e); j++; }
+    return {d:p.d, e:med(w)};
+  });
+  for(let pass=0;pass<2;pass++){
+    for(let i=1;i<cp.length-1;i++){
+      const exp=(cp[i-1].e+cp[i+1].e)/2;
+      if(Math.abs(cp[i].e-exp)>12) cp[i].e=exp;
+    }
+  }
+  const src=cp;
+  const eleRaw=(d)=>{
+    if(d<=0) return src[0].e; if(d>=total) return src[src.length-1].e;
+    let lo=0,hi=src.length-1;
+    while(hi-lo>1){const m=(lo+hi)>>1;(src[m].d<=d)?lo=m:hi=m;}
+    const a=src[lo],b=src[hi],f=(d-a.d)/Math.max(1e-6,b.d-a.d);
     return a.e+(b.e-a.e)*f;
   };
-  const win=Math.max(80, Math.min(150, total/40));
-  const out=[];
+  // 2) 每 30m 重取樣，±60m 移動平均平滑
+  const step=30, N=Math.max(4,Math.round(total/step));
+  const rs=[]; for(let i=0;i<=N;i++){const d=total*i/N; rs.push({d,e:eleRaw(d)});}
+  const sm=rs.map((p,i)=>{let s=0,c=0;for(let k=-2;k<=2;k++){const j=i+k;if(j>=0&&j<rs.length){s+=rs[j].e;c++;}}return {d:p.d,e:s/c};});
+  const eleAt=(d)=>{
+    const f=Math.min(Math.max(d,0),total)/total*N, i=Math.min(N-1,Math.floor(f)), t=f-i;
+    return sm[i].e+(sm[i+1].e-sm[i].e)*t;
+  };
+  // 3) 100m 視窗坡度樣本（供坡度帶／均坡）
+  const win=100, out=[];
   for(let d0=0; d0<total; d0+=win){
     const d1=Math.min(total,d0+win);
-    const run=Math.max(1,d1-d0);
-    out.push({d0,d1,g:(eleAt(d1)-eleAt(d0))/run*100});
+    out.push({d0,d1,g:(eleAt(d1)-eleAt(d0))/Math.max(1,d1-d0)*100});
   }
-  return {samples:out, total, profile:pts};
+  // 3.5) 爬坡區塊：連續爬升區段（樣本坡>1%，容許 ≤200m 的緩/降併入），主爬坡＝爬升量最大者
+  const blocks=[]; let bk=null, slack=0;
+  out.forEach(s=>{
+    if(s.g>1){ if(!bk) bk={d0:s.d0,d1:s.d1}; else bk.d1=s.d1; slack=0; }
+    else if(bk){ slack+=s.d1-s.d0; if(slack>200){ blocks.push(bk); bk=null; } else bk.d1=s.d1; }
+  });
+  if(bk) blocks.push(bk);
+  const blockInfo=blocks.map(b=>{
+    const gain=eleAt(b.d1)-eleAt(b.d0), len=b.d1-b.d0;
+    return {d0:b.d0,d1:b.d1,len,gain,avg:gain/Math.max(1,len)*100};
+  }).filter(b=>b.gain>=30);
+  const mainClimb = blockInfo.length ? blockInfo.reduce((a,b)=>b.gain>a.gain?b:a) : null;
+  const blockAt = d => blockInfo.find(b=>d>=b.d0-50 && d<=b.d1+50);
+
+  // 4) 最陡＝連續 300m 的最大平均「爬」坡；比例檢定＋區塊背書：
+  //    視窗坡度不得超過「前後外推 250m 的脈絡平均坡 × 2.2 ＋ 3 個百分點」。
+  //    真實陡爬的脈絡本身就陡（天花板遠高於自身）；孤立凸包的脈絡只剩基礎坡，撐不起自己，出局。
+  let maxEligible=0, maxPlain=0; const elig=[];
+  for(let d0=0; d0+300<=total || d0===0; d0+=100){
+    const d1=Math.min(total,d0+300); if(d1-d0<150) break;
+    const g=(eleAt(d1)-eleAt(d0))/(d1-d0)*100;
+    if(g>maxPlain) maxPlain=g;
+    const ctxG=(ext)=>{
+      const c0=Math.max(0,d0-ext), c1=Math.min(total,d1+ext);
+      const n=eleAt(c1)-eleAt(c0);
+      return {net:n, g:n/Math.max(1,c1-c0)*100};
+    };
+    const cA=ctxG(250), cB=ctxG(500);           // 兩種尺度取較小：寬凸包無法用自身墊高天花板
+    const gctx=Math.min(cA.g, cB.g);
+    const blk=blockAt((d0+d1)/2);               // 區塊背書：零星陡窗須被所在爬坡區塊的均坡撐起
+    const backed = blk && blk.avg >= 0.45*g;
+    elig.push((g>0 && cA.net>=15 && g<=2.2*Math.max(0,gctx)+3 && backed) ? g : 0);
+  }
+  // 相鄰視窗一致性：報告值＝min(自身, 相鄰兩窗較大者)——孤立鋸齒（DEM 切過髮夾彎）自然塌陷，
+  // 真正持續的陡爬前後視窗同樣陡，不受影響
+  for(let i=0;i<elig.length;i++){
+    const nb=Math.max(elig[i-1]||0, elig[i+1]||0);
+    const v=Math.min(elig[i], nb>0?nb:elig[i]*0.72);
+    if(v>maxEligible) maxEligible=v;
+  }
+  if(maxEligible===0){   // 全程無持續爬升：用正坡樣本的 90 百分位當代表值
+    const pos=out.filter(x=>x.g>0).map(x=>x.g).sort((a,b)=>a-b);
+    maxEligible = pos.length ? pos[Math.floor(pos.length*0.9)] : 0;
+  }
+  const artifact = (maxPlain - maxEligible) > 8;   // 假凸包被濾掉的痕跡，如實標示
+  let maxSus=maxEligible, noisy=false;
+  if(maxSus>30){ maxSus=30; noisy=true; }
+  // 5) 爬升/下降改由平滑剖面重算（每步 0.3m 死區）
+  let up=0,down=0;
+  for(let i=1;i<sm.length;i++){const dE=sm[i].e-sm[i-1].e;
+    if(dE>0.3)up+=dE; else if(dE<-0.3)down-=dE;}
+  return {samples:out, total, profile:sm, up:Math.round(up), down:Math.round(down),
+          maxSus:Math.round(maxSus*10)/10, noisy, artifact, repaired, mainClimb};
 }
 
 function summarizeGrades(gr){
-  if(!gr) return {maxG:null,avgG:null,bands:null};
+  if(!gr) return {maxG:null,avgG:null,bands:null,noisy:false,artifact:false};
   const s=gr.samples;
   const climbs=s.filter(x=>x.g>0.5);
   const avgG = climbs.length ? climbs.reduce((a,x)=>a+x.g*(x.d1-x.d0),0)/climbs.reduce((a,x)=>a+(x.d1-x.d0),0) : 0;
-  const sorted=[...s].sort((a,b)=>b.g-a.g);
-  const maxG = sorted.length? sorted[Math.min(1,sorted.length-1)].g : 0; // 2nd highest ≈ robust max
-  const bands={flat:0,gentle:0,steep:0,vsteep:0,extreme:0};
-  s.forEach(x=>{ const L=x.d1-x.d0, g=Math.abs(x.g);
-    if(g<=2)bands.flat+=L; else if(g<=5)bands.gentle+=L; else if(g<=8)bands.steep+=L;
+  const bands={flat:0,gentle:0,steep:0,vsteep:0,extreme:0,down:0,downS:0};
+  s.forEach(x=>{ const L=x.d1-x.d0, g=x.g;
+    if(g<=-8)bands.downS+=L; else if(g<-2)bands.down+=L;
+    else if(g<=2)bands.flat+=L; else if(g<=5)bands.gentle+=L; else if(g<=8)bands.steep+=L;
     else if(g<=12)bands.vsteep+=L; else bands.extreme+=L; });
-  return {maxG:Math.round(maxG*10)/10, avgG:Math.round(avgG*10)/10, bands}; // bands 為公尺
+  return {maxG:gr.maxSus, avgG:Math.round(avgG*10)/10, bands, noisy:gr.noisy, artifact:gr.artifact,
+          mainClimb:gr.mainClimb}; // bands 為公尺
 }
 
 async function routeSegment(a,b){
   try{
     const r=await fetch(API('/api/route'),{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({coordinates:[[a.lng,a.lat],[b.lng,b.lat]]})});
-    if(!r.ok) return null;
+    if(!r.ok){ try{ console.warn('[路網] ORS →', r.status, (await r.text()).slice(0,120)); }catch(e){} return null; }
     const j=await r.json();
     if(!j.geometry) return null;
-    const gr=gradesFromGeom(j.geometry);
-    const sum=summarizeGrades(gr);
-    return { dist:(j.distance||0)/1000, up:j.ascent||0, down:j.descent||0,
-             geom:j.geometry, grades:gr, steps:j.steps||[], est:false, ...sum };
+    return buildSegFromRoute(j.geometry, j.steps||[], (j.distance||0)/1000, j.ascent||0, j.descent||0);
   }catch(e){ return null; }
+}
+
+function buildSegFromRoute(geometry, steps, distKm, ascent, descent){
+  let repairs=[];
+  if(steps && steps.length && geometry && geometry.length>2){
+    let rawLen=0;
+    for(let i=1;i<geometry.length;i++)
+      rawLen+=haversine({lat:geometry[i-1][1],lng:geometry[i-1][0]},{lat:geometry[i][1],lng:geometry[i][0]})*1000;
+    const stepTot=steps.reduce((a,s)=>a+(s.distance||0),0)||1;
+    const sc=rawLen/stepTot; let cum=0;
+    steps.forEach(s=>{
+      const d=s.distance||0, nm=s.name||"";
+      if(/隧道|地下道/.test(nm) || (/橋/.test(nm) && d>=150 && d<=2000))
+        repairs.push({a:cum*sc, b:(cum+d)*sc, why:nm});
+      cum+=d;
+    });
+  }
+  const gr=gradesFromGeom(geometry, repairs);
+  const sum=summarizeGrades(gr);
+  return { dist:distKm,
+           up: gr? gr.up : ascent,
+           down: gr? gr.down : descent,
+           geom:geometry, grades:gr, steps:steps, est:false, ...sum };
+}
+
+// ---------- 備援路由:Valhalla(FOSSGIS 公共節點,瀏覽器直連,自行車模式) ----------
+function xbDecodePoly6(str){
+  let i=0, lat=0, lng=0; const out=[];
+  while(i<str.length){
+    for(const which of [0,1]){
+      let shift=0, result=0, b;
+      do{ b=str.charCodeAt(i++)-63; result|=(b&0x1f)<<shift; shift+=5; }while(b>=0x20);
+      const d=(result&1)?~(result>>1):(result>>1);
+      if(which===0) lat+=d; else lng+=d;
+    }
+    out.push([lng/1e6, lat/1e6]);
+  }
+  return out;
+}
+async function valhallaSegment(a,b){
+  try{
+    const body={locations:[{lat:a.lat,lon:a.lng},{lat:b.lat,lon:b.lng}],
+                costing:"bicycle", directions_options:{units:"kilometers", language:"zh-TW"}};
+    const ctl=new AbortController(); const to=setTimeout(()=>ctl.abort(),12000);
+    const r=await fetch('https://valhalla1.openstreetmap.de/route',{method:'POST',
+      headers:{'content-type':'application/json'}, body:JSON.stringify(body), signal:ctl.signal});
+    clearTimeout(to);
+    if(!r.ok){ console.warn('[路網] Valhalla → HTTP', r.status); return null; }
+    const j=await r.json();
+    const leg=j&&j.trip&&j.trip.legs&&j.trip.legs[0]; if(!leg||!leg.shape) return null;
+    let pts=xbDecodePoly6(leg.shape);
+    if(pts.length<2) return null;
+    if(pts.length>300){ const k=Math.ceil(pts.length/300);
+      pts=pts.filter((_,idx)=>idx%k===0 || idx===0); if(pts[pts.length-1]!==undefined) pts.push(...[]); }
+    // 海拔補齊:Open-Meteo elevation,每批 100 點
+    const ele=[];
+    for(let s=0;s<pts.length;s+=100){
+      const chunk=pts.slice(s,s+100);
+      const er=await fetch('https://api.open-meteo.com/v1/elevation?latitude='+
+        chunk.map(p=>p[1].toFixed(5)).join(',')+'&longitude='+chunk.map(p=>p[0].toFixed(5)).join(','));
+      if(!er.ok) return null;
+      const ej=await er.json();
+      if(!ej.elevation || ej.elevation.length!==chunk.length) return null;
+      ele.push(...ej.elevation);
+    }
+    const geometry=pts.map((p,idx)=>[p[0],p[1],ele[idx]]);
+    const steps=(leg.maneuvers||[]).map(m=>({
+      distance:(m.length||0)*1000,
+      name:(m.street_names&&m.street_names.join('／'))||'',
+      instruction:m.instruction||'' }));
+    const distKm=(j.trip.summary&&j.trip.summary.length)||0;
+    return buildSegFromRoute(geometry, steps, distKm, 0, 0);
+  }catch(e){ console.warn('[路網] Valhalla 失敗:', String(e&&e.message||e)); return null; }
 }
 
 async function routeAll(){
   SEGDATA=[]; let anyReal=false, anyEst=false;
   const pts = REVERSED ? [...ROUTE].reverse() : ROUTE.slice();
-  for(let i=1;i<pts.length;i++){
-    showLoading(`規劃路徑 ${i} / ${pts.length-1}：${pts[i-1].n} → ${pts[i].n}`);
-    const seg = await routeSegment(pts[i-1],pts[i]) || estSegment(pts[i-1],pts[i]);
-    seg.est ? anyEst=true : anyReal=true;
-    SEGDATA.push(seg);
-  }
+  const n = pts.length-1;
+  showLoading(tx('ldRouteAll')(n));
+  // 並行請求全部路段;單段失敗自動重試一次(間隔 800ms),再敗才退直線推估
+  const withRetry = async (a,b)=>{
+    let seg = await routeSegment(a,b);
+    if(!seg){ await new Promise(r=>setTimeout(r,800)); seg = await routeSegment(a,b); }
+    if(!seg){ seg = await valhallaSegment(a,b); }
+    return seg || estSegment(a,b);
+  };
+  const segs = await Promise.all(
+    Array.from({length:n}, (_,k)=> withRetry(pts[k], pts[k+1]))
+  );
+  segs.forEach(seg=>{ seg.est ? anyEst=true : anyReal=true; SEGDATA.push(seg); });
   const modeEl=document.getElementById('routeMode');
-  if(modeEl) modeEl.textContent = anyReal
-    ? (anyEst? "部分路段為直線推估（路網服務未回應）" : "路徑、距離與坡度皆依真實路網計算")
-    : "目前為直線推估模式 — 部署 ORS_API_KEY 後即為真實路網";
+  const stamp=new Date(), hhmm=String(stamp.getHours()).padStart(2,"0")+":"+String(stamp.getMinutes()).padStart(2,"0");
+  if(modeEl) modeEl.textContent = (anyReal
+    ? (anyEst? tx('livePart') : tx('liveReal'))
+      : tx('liveNoKey'))
+    + tx('liveAt')(hhmm);
 }
 
 // ---------- retreat points via road-distance matrix ----------
@@ -947,7 +1848,8 @@ async function computeRetreats(){
   });
   const capped = cand.slice(0, Math.max(1, 40 - pts.length));
   let dm=null;
-  try{
+  const anyNear = perWp.some(w=>w[0] && w[0].d<=100);
+  if(anyNear) try{
     const r=await fetch(API('/api/matrix'),{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({sources:pts.map(p=>[p.lng,p.lat]), destinations:capped.map(s=>[s[2],s[1]])})});
     if(r.ok){ const j=await r.json(); if(j.distances) dm=j.distances; }
@@ -963,7 +1865,7 @@ async function computeRetreats(){
     }
     if(best){
       const km=best.d/1000;
-      p.retreat={ st:`${best.s[3]} ${best.s[0]}站`, km:Math.round(km*10)/10,
+      if(km<=60) p.retreat={ st:{ty:best.s[3],nm:best.s[0]}, km:Math.round(km*10)/10,
                   road:best.road, hard:km>8 };
     }
   });
@@ -973,64 +1875,264 @@ async function computeRetreats(){
 async function aiParse(){
   const ta=document.getElementById('tripText'), btn=document.getElementById('aiBtn'), note=document.getElementById('aiNote');
   const text=ta.value.trim(); if(!text) return;
-  btn.disabled=true; btn.textContent="AI 解析中…"; note.className="ai-note"; note.textContent="";
-  showLoading("AI 讀取路線中…");
+  btn.disabled=true; btn.textContent=tx('aiBusy'); note.className="ai-note"; note.textContent="";
+  showLoading(tx('aiBusy'));
   const fail=(msg)=>{ note.className="ai-note err"; note.textContent=msg;
-    btn.disabled=false; btn.textContent="AI 解析路線"; ROUTE=[]; renderRoute(); };
+    btn.disabled=false; btn.textContent=tx('aiBtn'); ROUTE=[]; renderRoute(); };
   let resp;
   try{ resp=await fetch(API('/api/extract'),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text})}); }
-  catch(e){ return fail("無法連線 AI 解析服務 — 請確認已部署 Netlify Functions"); }
-  if(resp.status===404) return fail("AI 解析服務未部署 — 請依 README 部署 Functions 並設定 ANTHROPIC_API_KEY");
+  catch(e){ return fail(tx('errFn')); }
+  if(resp.status===404) return fail(tx('errDeploy'));
   const j=await resp.json().catch(()=>null);
-  if(!j || j.error || !Array.isArray(j.waypoints)) return fail(j&&j.error ? j.error : "AI 回應格式異常");
-  if(!j.waypoints.length) return fail("AI 沒有從文字中讀出地點，換段文字試試");
+  if(!j || j.error || !Array.isArray(j.waypoints)) return fail(j&&j.error ? j.error : tx('errFmt'));
+  if(!j.waypoints.length) return fail(tx('errNone'));
 
   const located=[], missed=[]; let last=null;
   for(let i=0;i<j.waypoints.length;i++){
     const wpt=j.waypoints[i];
-    showLoading(`定位 ${i+1} / ${j.waypoints.length}：${wpt.name}`);
+    showLoading(tx('ldLocate')(i+1, j.waypoints.length, wpt.name));
     let w=null;
     const loc=localMatches(wpt.name);
     if(loc.length){
-      const top=loc[0], eq=normName(top.n)===normName(wpt.name)||top.n.includes(wpt.name)||wpt.name.includes(normName(top.n));
+      const top=loc[0], eq=xbLocalEq(top, wpt.name);
       if(eq) w = top.kind==='gaz'?wpFromGaz(top.g) : top.kind==='sta'?wpFromStation(top.s) : null;
     }
     if(!w){
-      try{
-        const q=new URLSearchParams({q:wpt.name}); if(wpt.region)q.set('region',wpt.region);
-        if(last)q.set('near',last.lat+','+last.lng);
-        const r=await fetch(API('/api/geocode?')+q.toString());
-        if(r.ok){ const g=await r.json();
-          if(g.results&&g.results[0]) w=wpFromGeo({n:wpt.name,lat:g.results[0].lat,lng:g.results[0].lng,elev:null}); }
-      }catch(e){}
+      const rs=await xbGeocode(wpt.name, wpt.region||"", last, {gate:true});
+      if(rs&&rs[0]) w=wpFromGeo({n:wpt.name,lat:rs[0].lat,lng:rs[0].lng,elev:null});
     }
-    if(w){ located.push(w); last=w; } else missed.push(wpt.name);
+    if(w && last && haversine(last,w)>500){ missed.push(wpt.name); }
+    else if(w && last && (normName(w.n)===normName(last.n) || haversine(last,w)<0.15)){ /* 連續重複,靜默併合 */ }
+    else if(w){ located.push(w); last=w; } else missed.push(wpt.name);
   }
-  WAYPOINTS=located; renderWaypoints();
-  note.textContent = missed.length ? "認得但定不了位、已略過："+missed.join("、") : `已讀出 ${located.length} 個地點`;
-  btn.disabled=false; btn.textContent="AI 解析路線";
-  analyze();
+  GPXDATA=null; WAYPOINTS=located; renderWaypoints();
+  note.textContent = missed.length ? tx('aiMissed')(missed) : tx('aiOk')(located.length);
+  btn.disabled=false; btn.textContent=tx('aiBtn');
+  NEED_RUN=true; paintGo();
+  renderRoute();
 }
 
 // ---------- map ----------
 let MAP=null, MAPLAYER=null;
-function gradeColor(g){ const a=Math.abs(g);
-  return a<=2?"#5FA046" : a<=5?"#B08A3E" : a<=8?"#CE8418" : a<=12?"#BE5027" : "#8C2318"; }
-function drawElev(id, gr){
+
+// ================= 沿線補給 + 離線快照 (v2.2) =================
+let SUPPLY=[], SUP_FAIL=false, NEED_RUN=false;
+function xbDetour(pts){
+  // 對每個中間點算直線繞行量:d(prev,k)+d(k,next)-d(prev,next);回傳最大者
+  let worst=null;
+  for(let k=1;k<pts.length-1;k++){
+    const a=pts[k-1], b=pts[k], c=pts[k+1];
+    const extra=haversine(a,b)+haversine(b,c)-haversine(a,c);
+    if(!worst || extra>worst.extra) worst={i:k, n:b.n, extra};
+  }
+  return worst;
+}
+function xbBucketSup(segs, nodes){
+  // 依各段累積里程分桶;最長無補給缺口只計超商/飲水(公廁不解渴)
+  let c0=0;
+  segs.forEach(s=>{
+    const c1=c0+s.dist;
+    const list=nodes.filter(n=>n.at>=c0-0.05 && n.at<c1+0.05);
+    const hyd=[c0,...list.filter(n=>n.k!=='toilet').map(n=>n.at),c1].sort((a,b)=>a-b);
+    let gap=0; for(let i=1;i<hyd.length;i++) gap=Math.max(gap,hyd[i]-hyd[i-1]);
+    s.sup={ n:{store:list.filter(x=>x.k==='store').length,
+               water:list.filter(x=>x.k==='water').length,
+               toilet:list.filter(x=>x.k==='toilet').length},
+            gap:Math.round(gap*10)/10, dist:Math.round(s.dist*10)/10 };
+    c0=c1;
+  });
+}
+function xbParseOverpass(j){
+  return ((j&&j.elements)||[]).map(e=>{
+    const t=e.tags||{};
+    const k=t.shop==='convenience'?'store':t.amenity==='toilets'?'toilet':'water';
+    const lat=(e.lat!=null)?e.lat:(e.center&&e.center.lat);
+    const lng=(e.lon!=null)?e.lon:(e.center&&e.center.lon);
+    return {k,nm:t.name||t.brand||'',lat,lng};
+  }).filter(n=>isFinite(n.lat)&&isFinite(n.lng)).slice(0,350);
+}
+async function xbSupplyNodes(P){
+  // 瀏覽器直連 Overpass(CORS 開放、住宅 IP 不受雲端限流);兩鏡像競速,全滅才退 /api/supply
+  const chain=P.map(p=>p[0]+','+p[1]).join(',');
+  const ql=`[out:json][timeout:25];nwr[~"^(shop|amenity)$"~"^(convenience|toilets|drinking_water)$"](around:400,${chain});out center 350;`;
+  const eps=['https://overpass-api.de/api/interpreter','https://overpass.kumi.systems/api/interpreter','https://overpass.osm.jp/api/interpreter'];
+  const direct=await new Promise(res=>{
+    let left=eps.length, done=false;
+    const fin=v=>{ if(done) return; if(v){ done=true; res(v); return; } if(--left<=0){ done=true; res(null); } };
+    eps.forEach(ep=>{
+      const ctl=new AbortController(); const to=setTimeout(()=>ctl.abort(),15000);
+      fetch(ep,{method:'POST',headers:{'content-type':'application/x-www-form-urlencoded'},
+                body:'data='+encodeURIComponent(ql),signal:ctl.signal})
+        .then(r=>r.ok?r.json():Promise.reject(new Error(ep+' → HTTP '+r.status)))
+        .then(j=>{ clearTimeout(to); if(j&&j.remark) console.warn('[補給] overpass remark:',j.remark); fin(j); })
+        .catch(e=>{ clearTimeout(to); console.warn('[補給] 直連失敗:',String(e&&e.message||e)); fin(null); });
+    });
+  });
+  if(direct) return xbParseOverpass(direct);
+  try{
+    const r=await fetch(API('/api/supply'),{method:'POST',headers:{'content-type':'application/json'},
+      body:JSON.stringify({pts:P})});
+    if(!r.ok){ console.warn('[補給] 後援 /api/supply → HTTP', r.status); return null; }
+    const j=await r.json(); return (j&&j.nodes)||[];
+  }catch(e){ console.warn('[補給] 後援亦失敗:',String(e&&e.message||e)); return null; }
+}
+async function fetchSupply(){
+  SUPPLY=[]; SUP_FAIL=false; SEGDATA.forEach(s=>{ s.sup=null; });
+  try{
+    const line=[]; let cum=0;
+    SEGDATA.forEach(s=>{ const g=s.geom||[];
+      for(let i=0;i<g.length;i++){
+        if(i>0) cum+=haversine({lat:g[i-1][1],lng:g[i-1][0]},{lat:g[i][1],lng:g[i][0]});
+        line.push([g[i][1],g[i][0],cum]);
+      }});
+    const total=cum; if(total<0.5 || total>400 || line.length<2) return;
+    const step=Math.max(0.6,total/120);
+    const samp=[]; let next=0;
+    line.forEach(p=>{ if(p[2]>=next){ samp.push(p); next=p[2]+step; } });
+    if(samp[samp.length-1][2]<total-0.2) samp.push(line[line.length-1]);
+    const P=samp.map(p=>[+p[0].toFixed(4),+p[1].toFixed(4)]);
+    const nodes=await xbSupplyNodes(P);
+    if(nodes===null){ SUP_FAIL=true; return; }
+    SUPPLY=nodes.map(n=>{
+      let bd=1e9,bk=0;
+      samp.forEach(p=>{ const d=haversine({lat:p[0],lng:p[1]},{lat:n.lat,lng:n.lng}); if(d<bd){bd=d;bk=p[2];} });
+      return {k:n.k,nm:n.nm||"",lat:n.lat,lng:n.lng,at:Math.round(bk*100)/100,off:bd};
+    }).filter(n=>n.off<=(step/2+0.45)).sort((a,b)=>a.at-b.at);
+    xbBucketSup(SEGDATA, SUPPLY);
+  }catch(e){ SUPPLY=[]; }
+}
+function supHtml(S){
+  if(!S || !S.sup) return "";
+  const p=S.sup, bits=[];
+  if(p.n.store)  bits.push(`${tx('supStore')}×${p.n.store}`);
+  if(p.n.water)  bits.push(`${tx('supWater')}×${p.n.water}`);
+  if(p.n.toilet) bits.push(`${tx('supToilet')}×${p.n.toilet}`);
+  const warn=(p.gap>=10 && p.dist>=8)?` <span class="sup-warn">⚠ ${tx('supGap')(p.gap)}</span>`:"";
+  if(!bits.length && !warn) return "";
+  return `<div class="sup-line"><span class="sup-k">${tx('supplyK')}</span>${bits.join(' · ')||tx('supNone')}${warn}</div>`;
+}
+function paintGo(){
+  const abv=document.getElementById('aiBtn'); if(abv) abv.hidden=false;
+  const b=document.getElementById('goBtn'); if(!b) return;
+  b.hidden=false;
+  const ready = WAYPOINTS.length>=2;
+  b.disabled = !ready;
+  const hh=document.getElementById('goHint');
+  if(hh){
+    if(!ready){ hh.hidden=false; hh.textContent=tx('goNeed'); }
+    else { const show = SEGDATA.length>0 && NEED_RUN;
+           hh.hidden=!show; if(show) hh.textContent=tx('goHint'); }
+    hh.classList.toggle('warn', ready);
+  }
+}
+function saveSnap(){
+  const pack=segs=>({v:1,t:Date.now(),wp:WAYPOINTS,seg:segs,wx:[...WXMAP],src:WXSRC,sup:SUPPLY,
+                     start:START,dwell:DWELL,rev:REVERSED,date:START_DATE.toISOString()});
+  try{ localStorage.setItem('xb_snap',JSON.stringify(pack(SEGDATA))); }
+  catch(e){
+    try{ const slim=SEGDATA.map(x=>({...x, geom:(x.geom||[]).filter((_,i)=>i%3===0)}));
+         localStorage.setItem('xb_snap',JSON.stringify(pack(slim))); }catch(e2){}
+  }
+  paintSnapBar();
+}
+function loadSnapObj(){
+  try{ const s=JSON.parse(localStorage.getItem('xb_snap')||'null');
+       return (s&&s.v===1&&Array.isArray(s.wp)&&s.wp.length>=2)?s:null; }catch(e){ return null; }
+}
+function restoreSnap(){
+  const s=loadSnapObj(); if(!s) return false;
+  WAYPOINTS=s.wp; ROUTE=WAYPOINTS.slice(); SEGDATA=s.seg||[];
+  WXMAP=new Map(s.wx||[]); WXSRC=s.src||{k:'demo'}; SUPPLY=s.sup||[];
+  START=s.start; DWELL=s.dwell; REVERSED=!!s.rev; START_DATE=new Date(s.date);
+  const di=document.getElementById('startDate'); if(di&&!isNaN(START_DATE)) di.value=dateISO(START_DATE);
+  const ti=document.getElementById('startTime'); if(ti) ti.value=String(Math.floor(START/60)).padStart(2,'0')+':'+String(START%60).padStart(2,'0');
+  const dw=document.getElementById('dwell'); if(dw) dw.value=DWELL;
+  applyStatic();
+  renderWaypoints(); renderToday(); renderRoute(); renderMap();
+  const tools=document.getElementById('routeTools'); if(tools) tools.hidden=ROUTE.length<2;
+  const dis=document.getElementById('disclaim'); if(dis) dis.hidden=ROUTE.length<2;
+  const gm=document.getElementById('gmapsBtn'); if(gm) gm.href=gmapsUrl();
+  const modeEl=document.getElementById('routeMode'); if(modeEl) modeEl.textContent=tx('snapRestored')(snapWhen(s.t));
+  paintGo();
+  return true;
+}
+const snapWhen=t=>{ const d=new Date(t); return `${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`; };
+function paintSnapBar(){
+  const bar=document.getElementById('snapBar'); if(!bar) return;
+  const s=loadSnapObj();
+  // 隱藏時一併清空內容：舊快照的按鈕不會殘留在畫面上（之前 .snap-bar 的 display:flex 蓋過了 hidden）
+  if(!s || WAYPOINTS.length>=2){ bar.hidden=true; bar.innerHTML=''; return; }
+  bar.hidden=false;
+  bar.innerHTML=`<button type="button" class="mini-btn" id="snapBtn">${tx('snapBtn')}</button>`+
+    `<span class="snap-meta">${s.wp[0].n} → ${s.wp[s.wp.length-1].n} · ${snapWhen(s.t)}${navigator.onLine?'':' · '+tx('snapOffline')}</span>`;
+  const b=document.getElementById('snapBtn'); if(b) b.addEventListener('click',()=>{
+    try{ if(!restoreSnap()) paintSnapBar(); }
+    catch(e){ console.error('[還原快照]', e); paintSnapBar(); }
+  });
+}
+// ================= /補給 + 快照 =================
+
+function gradeColor(g){
+  if(g<-8) return "#4A6076";        // 陡降
+  if(g<-2) return "#8FA0B5";        // 下坡
+  return g<=2?"#5FA046" : g<=5?"#B08A3E" : g<=8?"#CE8418" : g<=12?"#BE5027" : "#8C2318";
+}
+function drawElev(id, gr, steps){
   const cv=document.getElementById(id); if(!cv) return;
-  const W=cv.clientWidth||600, H=56; cv.width=W*2; cv.height=H*2;
+  const W=cv.clientWidth||600, H=72; cv.width=W*2; cv.height=H*2;
   const ctx=cv.getContext('2d'); ctx.scale(2,2);
   const P=gr.profile, T=gr.total;
-  let mn=Infinity,mx=-Infinity; P.forEach(p=>{mn=Math.min(mn,p.e);mx=Math.max(mx,p.e);});
+  let mn=Infinity,mx=-Infinity,pi=0;
+  P.forEach((p,i)=>{ if(p.e<mn)mn=p.e; if(p.e>mx){mx=p.e;pi=i;} });
   const pad=6, span=Math.max(20,mx-mn);
-  const X=d=>pad+(W-2*pad)*d/T, Y=e=>H-4-(H-14)*(e-mn)/span;
+  const X=d=>pad+(W-2*pad)*d/T, Y=e=>H-6-(H-30)*(e-mn)/span;
   ctx.beginPath(); ctx.moveTo(X(0),H);
   P.forEach(p=>ctx.lineTo(X(p.d),Y(p.e))); ctx.lineTo(X(T),H); ctx.closePath();
-  ctx.fillStyle="rgba(176,138,62,0.18)"; ctx.fill();
-  ctx.beginPath(); P.forEach((p,i)=>i?ctx.lineTo(X(p.d),Y(p.e)):ctx.moveTo(X(p.d),Y(p.e)));
-  ctx.strokeStyle="#B08A3E"; ctx.lineWidth=1.6; ctx.stroke();
-  ctx.fillStyle="#857A66"; ctx.font="10px Fraunces, serif";
-  ctx.fillText(Math.round(mx)+"m",4,10); ctx.fillText(Math.round(mn)+"m",4,H-6);
+  ctx.fillStyle="rgba(176,138,62,0.14)"; ctx.fill();
+  // 剖面線依坡度帶著色（顏色與坡度組成、地圖一致）
+  ctx.lineWidth=2.2; ctx.lineCap="round";
+  let ci=0;
+  gr.samples.forEach(sm=>{
+    ctx.beginPath();
+    let started=false;
+    while(ci<P.length && P[ci].d<=sm.d1+1){
+      const x=X(P[ci].d), y=Y(P[ci].e);
+      started ? ctx.lineTo(x,y) : (ctx.moveTo(x,y), started=true);
+      ci++;
+    }
+    if(ci<P.length){ ctx.lineTo(X(P[ci].d),Y(P[ci].e)); }
+    ci=Math.max(0,ci-1);
+    ctx.strokeStyle=gradeColor(sm.g); ctx.stroke();
+  });
+  ctx.font="9px 'Noto Serif TC', serif";
+  // 最高點標記
+  const px=Math.min(W-30,Math.max(16,X(P[pi].d))), py=Y(P[pi].e);
+  ctx.fillStyle="#BE5027";
+  ctx.beginPath(); ctx.arc(X(P[pi].d),py,2.4,0,7); ctx.fill();
+  ctx.fillText("▲"+Math.round(P[pi].e)+"m", px-12, Math.max(9,py-5));
+  ctx.fillStyle="#857A66";
+  ctx.fillText(Math.round(mn)+"m",4,H-2);
+  // 重要路段標註：取最長的具名路段（≥600m），標在其中點
+  if(steps && steps.length){
+    const pos=[]; let cum=0;
+    steps.forEach(s=>{ pos.push({name:(s.name||"").trim(), mid:cum+s.distance/2, dist:s.distance}); cum+=s.distance; });
+    const scale=cum>0 ? T/cum : 1;
+    const named=pos.filter(p=>p.name && p.dist>=600).sort((a,b)=>b.dist-a.dist).slice(0,3)
+                   .sort((a,b)=>a.mid-b.mid);
+    let lastX=-999;
+    named.forEach(p=>{
+      let x=X(p.mid*scale);
+      const label=p.name.length>7?p.name.slice(0,7)+"…":p.name;
+      const tw=ctx.measureText(label).width;
+      x=Math.min(W-pad-tw, Math.max(pad, x-tw/2));
+      if(x-lastX<tw+14) return;                    // 避免標籤重疊
+      const cx2=x+tw/2;
+      ctx.strokeStyle="rgba(133,122,102,.55)"; ctx.lineWidth=1;
+      ctx.beginPath(); ctx.moveTo(cx2,H-4); ctx.lineTo(cx2,H-16); ctx.stroke();
+      ctx.fillStyle="#6f6552"; ctx.fillText(label,x,H-18);
+      lastX=x+tw;
+    });
+  }
 }
 function renderMap(){
   const el=document.getElementById('map');
@@ -1049,17 +2151,19 @@ function renderMap(){
   SEGDATA.forEach(seg=>{
     const g=seg.geom; if(!g) return;
     if(seg.grades){
-      // draw grade-coloured sub-polylines
-      const P=seg.grades.profile;
-      let cum=0, idx=0;
+      // 依原始幾何自身的累積距離切片，逐段以坡度著色（修正：剖面重取樣後索引不再對齊原始幾何）
+      const rawD=[0];
+      for(let i=1;i<g.length;i++) rawD[i]=rawD[i-1]+haversine({lat:g[i-1][1],lng:g[i-1][0]},{lat:g[i][1],lng:g[i][0]})*1000;
+      let idx=0, last=null;
       seg.grades.samples.forEach(sm=>{
-        const line=[];
-        while(idx<g.length && cum<=sm.d1){
-          line.push([g[idx][1],g[idx][0]]); all.push([g[idx][1],g[idx][0]]);
-          idx++; if(idx<g.length) cum=P[idx].d;
+        const line=[]; if(last) line.push(last);
+        while(idx<g.length && rawD[idx]<=sm.d1){
+          line.push([g[idx][1],g[idx][0]]); all.push([g[idx][1],g[idx][0]]); idx++;
         }
-        if(idx<g.length) line.push([g[idx][1],g[idx][0]]);
-        if(line.length>1) L.polyline(line,{color:gradeColor(sm.g),weight:4,opacity:.9}).addTo(MAPLAYER);
+        if(line.length>1){
+          L.polyline(line,{color:gradeColor(sm.g),weight:4,opacity:.9}).addTo(MAPLAYER);
+          last=line[line.length-1];
+        } else if(line.length===1){ last=line[0]; }
       });
     }else{
       const line=g.map(c=>[c[1],c[0]]); line.forEach(x=>all.push(x));
@@ -1070,6 +2174,12 @@ function renderMap(){
     L.circleMarker([p.lat,p.lng],{radius:7,color:"#FBF8F0",weight:2,fillColor:"#BE3D24",fillOpacity:1})
       .bindTooltip(`${i+1} ${p.n}`,{permanent:false}).addTo(MAPLAYER);
     all.push([p.lat,p.lng]);
+  });
+  SUPPLY.forEach(n=>{
+    const col=n.k==='store'?'#B08A3E':n.k==='water'?'#4F6157':'#857A66';
+    const lbl=n.k==='store'?tx('supStore'):n.k==='water'?tx('supWater'):tx('supToilet');
+    L.circleMarker([n.lat,n.lng],{radius:3.5,color:col,weight:1.6,fillColor:'#FBF8F0',fillOpacity:.92})
+      .bindTooltip(`${lbl}${n.nm?` · ${n.nm}`:''}`).addTo(MAPLAYER);
   });
   if(all.length) MAP.fitBounds(all,{padding:[24,24]});
 }
@@ -1082,7 +2192,7 @@ function buildGpx(){
   SEGDATA.forEach(seg=>{ (seg.geom||[]).forEach(c=>{
     trk+=`      <trkpt lat="${c[1]}" lon="${c[0]}">${c[2]!=null?`<ele>${Math.round(c[2])}</ele>`:""}</trkpt>\n`; });});
   return `<?xml version="1.0" encoding="UTF-8"?>
-<gpx version="1.1" creator="單車騎行農民曆" xmlns="http://www.topografix.com/GPX/1/1">
+<gpx version="1.1" creator="小布路書 Brompton Roadbook" xmlns="http://www.topografix.com/GPX/1/1">
 ${wpts}
   <trk><name>${xml(pts[0]?.n||"")} → ${xml(pts[pts.length-1]?.n||"")}</name><trkseg>
 ${trk}    </trkseg></trk>
@@ -1093,7 +2203,7 @@ function downloadGpx(){
   if(!SEGDATA.length) return;
   const blob=new Blob([buildGpx()],{type:"application/gpx+xml"});
   const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
-  a.download="騎行路線.gpx"; document.body.appendChild(a); a.click();
+  a.download=tx('gpxFile'); document.body.appendChild(a); a.click();
   setTimeout(()=>{URL.revokeObjectURL(a.href); a.remove();},500);
 }
 function gmapsUrl(){
@@ -1113,23 +2223,30 @@ function wpFromGaz(g){ return {n:g.n,lat:g.lat,lng:g.lng,elev:g.elev,wz:g.wz,esc
 function wpFromStation(s){ return {n:s[0]+"站",lat:s[1],lng:s[2],elev:null,wz:"basin",
   esc:{st:s[3]+" "+s[0]+"站（即在此）",km:0,hard:false},src:"sta"}; }
 function wpFromGeo(x){ const w={n:x.n,lat:x.lat,lng:x.lng,elev:(x.elev??null),wz:"basin",
-  esc:{st:"—（附近車站待接 TDX）",km:0,hard:false},src:"geo"}; if(w.elev!==null) w.wz=inferZone(w); return w; }
+  esc:{st:tx('escPending'),km:0,hard:false},src:"geo"}; if(w.elev!==null) w.wz=inferZone(w); return w; }
 
 function addWaypoint(w){
   WAYPOINTS.push(w);
-  wpInput.value=""; hideSuggest(); renderWaypoints(); analyze();
+  GPXDATA=null;
+    const lastWp=WAYPOINTS[WAYPOINTS.length-2];
+    if(lastWp && WAYPOINTS.length>=2 && (normName(lastWp.n)===normName(WAYPOINTS[WAYPOINTS.length-1].n) || haversine(lastWp,WAYPOINTS[WAYPOINTS.length-1])<0.15)) WAYPOINTS.pop();
+    wpInput.value=""; hideSuggest(); renderWaypoints(); NEED_RUN=true; paintGo();
   wpInput.focus();
 }
-function removeWaypoint(i){ WAYPOINTS.splice(i,1); renderWaypoints(); analyze(); }
+function removeWaypoint(i){ WAYPOINTS.splice(i,1); renderWaypoints(); NEED_RUN=true; paintGo(); }
 
 function renderWaypoints(){
   wpListEl.innerHTML="";
   WAYPOINTS.forEach((w,i)=>{
     const c=document.createElement('span'); c.className="wp-chip";
     c.innerHTML=`<span class="idx">${i+1}</span>${w.n}<button aria-label="移除">✕</button>`;
-    c.querySelector('button').addEventListener('click',()=>removeWaypoint(i));
+    c.querySelector('button').addEventListener('click',e=>{ e.stopPropagation(); removeWaypoint(i); });
+    c.style.cursor='pointer';
+    c.addEventListener('click',()=>{ if(MAP&&isFinite(w.lat)){ MAP.setView([w.lat,w.lng],14);
+      L.popup({closeButton:false,autoClose:true}).setLatLng([w.lat,w.lng]).setContent(`${i+1} · ${w.n}`).openOn(MAP); } });
     wpListEl.appendChild(c);
   });
+  try{ paintSnapBar(); }catch(e){}
 }
 
 // ----- suggestions -----
@@ -1140,9 +2257,11 @@ function localMatches(q){
   const nq=normName(q);
   const out=[];
   const match=(nm)=>{
-    if(nm.includes(q)||q.includes(nm)) return true;
+    if(nm.includes(q)) return true;
+    if(q.includes(nm) && nm.length>=q.length*0.6) return true;
     const nn=normName(nm);
-    return nq.length>0 && (nn.includes(nq) || nq.includes(nn));
+    if(nq.length>0 && nn.includes(nq)) return true;
+    return nq.length>0 && nq.includes(nn) && nn.length>=nq.length*0.6;
   };
   GAZ.forEach(g=>{ if([g.n,...g.a].some(match)) out.push({kind:"gaz",n:g.n,tag:"騎點",g}); });
   STATIONS.forEach(s=>{ if(match(s[0])) out.push({kind:"sta",n:s[0]+"站",tag:s[3],s}); });
@@ -1160,11 +2279,11 @@ function drawSuggest(items, loading, err){
   let html="";
   items.forEach((it,idx)=>{
     const tagCls = it.kind==="gaz"?"local": it.kind==="sta"?"sta":"";
-    html+=`<div class="sug-item${idx===0?' active':''}" data-i="${idx}"><span class="nm">${it.n}</span><span class="tag ${tagCls}">${it.tag||it.region||"地名"}</span></div>`;
+    html+=`<div class="sug-item${idx===0?' active':''}" data-i="${idx}"><span class="nm">${it.n}</span><span class="tag ${tagCls}">${it.kind==="sta"?(tx('staType')[it.tag]||it.tag):it.kind==="gaz"?tx('tagSpot'):(it.tag||it.region||tx('tagPlace'))}</span></div>`;
   });
-  if(loading) html+=`<div class="sug-note"><span class="sug-spin"></span>查詢更多地點…</div>`;
-  else if(err) html+=`<div class="sug-note">外部地名查詢無回應，僅顯示內建騎點與車站</div>`;
-  else if(!items.length) html+=`<div class="sug-note">找不到相符地點，換個關鍵字試試</div>`;
+  if(loading) html+=`<div class="sug-note"><span class="sug-spin"></span>${tx('sugMore')}</div>`;
+  else if(err) html+=`<div class="sug-note">${tx('sugErr')}</div>`;
+  else if(!items.length) html+=`<div class="sug-note">${tx('sugNone')}</div>`;
   suggestEl.innerHTML=html; suggestEl.hidden=false;
   suggestEl.querySelectorAll('.sug-item').forEach(el=>{
     el.addEventListener('click',()=>pick(+el.dataset.i));
@@ -1189,7 +2308,15 @@ function onInput(){
       if(myseq!==sugSeq) return;
       let geo=(r.results||[]).map(x=>({kind:"geo",n:x.n,region:x.region,lat:x.lat,lng:x.lng,elev:x.elev}));
       geo=geo.filter(gi=> !local.some(l=> l.n===gi.n || l.n===gi.n+"站"));
-      drawSuggest(local.concat(geo).slice(0,8), false, r.err);
+      const nqI=normName(q);
+      const rank=it=>{ const nn=normName(it.n);
+        if(nn===nqI||it.n===q) return 0;
+        if(nn.startsWith(nqI)) return 1;
+        if(nn.includes(nqI)) return 2;
+        if(nqI.includes(nn)) return 4;
+        return 3; };
+      const merged=local.concat(geo).sort((a,b)=>rank(a)-rank(b)||normName(a.n).length-normName(b.n).length);
+      drawSuggest(merged.slice(0,8), false, r.err);
     }, 300);
   }
 }
@@ -1201,7 +2328,15 @@ wpInput.addEventListener('keydown', e=>{
 document.addEventListener('click', e=>{ if(!e.target.closest('.combo')) hideSuggest(); });
 
 // ----- controls -----
-document.getElementById('clearBtn').addEventListener('click',()=>{ WAYPOINTS=[]; renderWaypoints(); ROUTE=[]; renderRoute(); });
+document.getElementById('clearBtn').addEventListener('click',()=>{ GPXDATA=null; WAYPOINTS=[]; ROUTE=[]; SEGDATA=[]; SUPPLY=[]; NEED_RUN=false; renderWaypoints(); renderRoute(); renderMap(); paintGo(); paintSnapBar(); });
+document.getElementById('startDate').value = dateISO(START_DATE);
+document.getElementById('startDate').addEventListener('input', async e=>{
+  const v=e.target.value; if(!v) return;
+  const d=new Date(v+"T00:00:00"); if(isNaN(d)) return;
+  START_DATE=d;
+  if(ROUTE.length>=2){ showLoading(tx('ldWxDate')); await fetchWeather(); }
+  renderRoute();
+});
 document.getElementById('startTime').addEventListener('input',e=>{
   const v=e.target.value; if(!/^\d{1,2}:\d{2}$/.test(v))return;
   const [h,m]=v.split(':').map(Number); START=h*60+m; renderRoute();
@@ -1211,28 +2346,68 @@ document.getElementById('dwell').addEventListener('input',e=>{
 });
 document.getElementById('revBtn').addEventListener('click',e=>{
   REVERSED=!REVERSED; e.currentTarget.classList.toggle('on',REVERSED);
-  e.currentTarget.textContent=REVERSED?"已反轉方向 ⇄":"反轉方向 ⇄";
+  e.currentTarget.textContent=REVERSED?tx('revOn'):tx('revOff');
   renderRoute();
 });
 
 document.getElementById('aiBtn').addEventListener('click', aiParse);
+document.getElementById('goBtn').addEventListener('click', ()=>analyze());
+document.getElementById('gpxFile').addEventListener('change', async e=>{
+  const f=e.target.files&&e.target.files[0]; e.target.value='';
+  if(!f) return;
+  const note=document.getElementById('gpxNote');
+  try{
+    const txt=await f.text();
+    const p=xbParseGpx(txt);
+    if(!p){ note.textContent=tx('gpxBad'); return; }
+    if(p.mode==='rte-sparse'){
+      GPXDATA=null;
+      WAYPOINTS=p.rpts.map((r,i)=>wpFromGeo({n:r.n||tx('wpVia')(i+1,''), lat:r.lat, lng:r.lng, elev:null}));
+      renderWaypoints(); NEED_RUN=true; paintGo(); renderRoute();
+      note.textContent=tx('gpxRte')(WAYPOINTS.length);
+      return;
+    }
+    note.textContent=tx('ldGpx');
+    const _e=p.track.map(t=>t[2]);
+    if(_e.some(x=>x==null) || _e.every(x=>!x)){
+      p.track.forEach(t=>{ if(!t[2]) t[2]=null; });
+      if(p.track.length>900){ const k=Math.ceil(p.track.length/900);
+        const t2=p.track.filter((_,i)=>i%k===0);
+        if(t2[t2.length-1][0]!==p.track[p.track.length-1][0]) t2.push(p.track[p.track.length-1]);
+        p.track=t2; }
+      const ok=await xbFillTrackEle(p.track);
+      if(!ok){ note.textContent=tx('gpxEleFail'); return; }
+    }
+    p.cum=xbTrackCum(p.track);
+    GPXDATA=p;
+    WAYPOINTS=xbGpxWaypoints(p.track,p.cum,p.wpts);
+    renderWaypoints(); NEED_RUN=true; paintGo(); renderRoute();
+    note.textContent=tx('gpxLoaded')(p.track.length, p.cum[p.cum.length-1].toFixed(0), WAYPOINTS.length);
+  }catch(err){ note.textContent=tx('gpxBad'); }
+});
 document.getElementById('gpxBtn').addEventListener('click', downloadGpx);
 loadTdxStations();
+console.log("小布路書 v2.6.3 (2026-09-10) · GPX/KML 匯入分析 · 桃園海岸騎點庫 · zh/en/ja · 離線快照＋沿線補給 · Komoot 834趟有效速度校準");
+document.querySelectorAll('.lang-sw button').forEach(b=>b.addEventListener('click',()=>setLang(b.dataset.lang)));
+applyStatic();
 renderWaypoints();
 renderToday();
 analyze();
+if('serviceWorker' in navigator){ try{ navigator.serviceWorker.register('sw.js'); }catch(e){} }
+window.addEventListener('online', paintSnapBar);
+window.addEventListener('offline', paintSnapBar);
+if(!navigator.onLine && loadSnapObj()){ restoreSnap(); } else { paintSnapBar(); }
 </script>
 </body>
 </html>'''
 
 html = (TEMPLATE
   .replace("/*__GAZ__*/", json.dumps(GAZ, ensure_ascii=False))
-  .replace("/*__TERMS__*/", json.dumps(TERM_JS, ensure_ascii=False))
+  .replace("/*__TERMS__*/", json.dumps(TERMS, ensure_ascii=False))
   .replace("/*__TSTARTS__*/", json.dumps(TERM_STARTS))
   .replace("/*__STATIONS__*/", json.dumps(STATIONS, ensure_ascii=False)))
 
-import os
-os.makedirs("public",exist_ok=True)
-with open("public/index.html","w",encoding="utf-8") as f:
+os.makedirs("public", exist_ok=True)
+with open("public/index.html", "w", encoding="utf-8") as f:
     f.write(html)
 print("written", len(html), "bytes")

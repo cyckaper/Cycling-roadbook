@@ -378,8 +378,16 @@ TEMPLATE = r'''<!DOCTYPE html>
   .sup-pin{display:flex; align-items:center; justify-content:center; box-sizing:border-box; border-radius:50%;
     background:#FBF8F0; border:1.5px solid currentColor; box-shadow:0 1px 2px rgba(0,0,0,.28)}
   .sup-pin svg{display:block; width:74%; height:74%}
-  .sup-store{color:#8A6420} .sup-water{color:#2F6E9E} .sup-toilet{color:#4A463F}
-  .sup-pin.sup-sm{opacity:.92}
+  .sup-store{color:#8B4C7E} .sup-water{color:#2F6E9E} .sup-toilet{color:#3F3A35}
+  /* v2.7.1 補給小圓點：16px 透明點擊區＋9px 色點（紫＝超商、藍＝飲水、深灰＝公廁，避開坡度色） */
+  .sup-dotm{background:none; border:0}
+  .sup-dotm::after{content:""; position:absolute; left:3.5px; top:3.5px; width:6px; height:6px; border-radius:50%;
+    background:currentColor; border:1.5px solid #FFFFFF; box-shadow:0 0 0 .6px rgba(42,38,34,.35)}
+  .xb-sup-sm .sup-dotm::after{left:4.5px; top:4.5px; width:4.5px; height:4.5px; border-width:1.25px}   /* 縮得很小時圓點再小一號，少蓋住路線 */
+  .sup-dot{display:inline-block; flex:none; width:7px; height:7px; border-radius:50%; background:currentColor;
+    border:1.5px solid #FFFFFF; box-shadow:0 0 0 1px rgba(42,38,34,.25); box-sizing:content-box; vertical-align:middle}
+  .mlg__dots{display:inline-flex; align-items:center; gap:5px; width:100%; padding:2px 0 1px 2px}
+  .mlg__tg{margin:6px 0 3px; font-size:12px; padding:3px 12px}
   .map-legend{margin:10px 0 0; padding:12px 16px 6px; background:var(--card); border:1px solid var(--line); border-radius:8px;
     font-size:12.5px; color:var(--body); line-height:1.7}
   .mlg__k{margin:0 0 4px; font-size:12px; letter-spacing:.14em; color:var(--muted)}
@@ -398,6 +406,8 @@ TEMPLATE = r'''<!DOCTYPE html>
   .route-tools{display:flex; flex-wrap:wrap; align-items:center; gap:10px; margin:10px 0 0}
   .tools-note{font-size:12px; color:var(--muted)}
   a.mini-btn{text-decoration:none; display:inline-block}
+  .mini-btn:disabled{opacity:.6; cursor:progress}
+  .tools-note.err{color:var(--risk)}
   .grade-chips{display:flex; flex-wrap:wrap; align-items:center; gap:5px; margin-top:6px}
   .gk{font-size:11px; letter-spacing:.14em; color:var(--muted); margin-right:2px}
   .gchip{font-size:11.5px; padding:2px 8px; border-radius:999px; color:#FBF8F0; letter-spacing:.02em}
@@ -574,18 +584,18 @@ TEMPLATE = r'''<!DOCTYPE html>
 </head>
 <body>
   <div class="wrap">
-    <div class="lang-sw" role="group" aria-label="Language">
+    <div class="lang-sw" role="group" aria-label="Language" data-html2canvas-ignore>
       <button type="button" data-lang="zh">中</button><button type="button" data-lang="en">EN</button><button type="button" data-lang="ja">日</button>
     </div>
-    <header class="mast">
+    <header class="mast" data-html2canvas-ignore>
       <p class="mast__ey">A Brompton Roadbook</p>
       <h1 class="mast__title">小布路書</h1>
       <p class="mast__sub" data-i18n="mastSub">Fold out, ride on — read the line through the day, and the season</p>
     </header>
 
-    <div class="today" id="todayCard"></div>
+    <div class="today" id="todayCard" data-html2canvas-ignore></div>
 
-    <div class="panel">
+    <div class="panel" data-html2canvas-ignore>
       <p class="panel__k" data-i18n="panelK">今日騎點 · 貼上整段行程，AI 讀出沿線地點</p>
       <textarea id="tripText" rows="3" data-i18n-ph="phTrip" placeholder="貼上路線敘述、遊記或地點清單，例如：花蓮車站出發，經七星潭、新城老街、佳興小吃店，進太魯閣到天祥…"></textarea>
       <div class="sub-div"><span data-i18n="orPick">或逐一挑選</span></div>
@@ -622,13 +632,15 @@ TEMPLATE = r'''<!DOCTYPE html>
 
     <div class="verdict" id="verdict"></div>
     <p class="disclaim" id="disclaim" data-i18n-html="disclaim" hidden>⚠ 路線、坡度、天氣皆為<b>推估</b>：實際狀況因所選路段、地形與季節變化甚大，本分析僅供行前參考，出發前後請以現場路況與官方資訊為準，並自負騎乘安全。</p>
-    <div id="map" class="map" hidden></div>
+    <div id="map" class="map" hidden data-html2canvas-ignore></div>
     <div class="map-legend" id="mapLegend" hidden></div>
-    <div class="snap-bar" id="snapBar" hidden></div>
-    <div class="route-tools" id="routeTools" hidden>
+    <div class="snap-bar" id="snapBar" hidden data-html2canvas-ignore></div>
+    <div class="route-tools" id="routeTools" hidden data-html2canvas-ignore>
       <button class="mini-btn" id="gpxBtn" data-i18n="gpxBtn">下載 GPX</button>
+      <button class="mini-btn" id="pdfBtn" data-i18n="pdfBtn">下載 PDF 報告</button>
       <a class="mini-btn" id="gmapsBtn" target="_blank" rel="noopener" data-i18n="gmapsBtn">在 Google 地圖開啟導航</a>
       <span class="tools-note" id="routeMode"></span>
+      <span class="tools-note" id="pdfNote" hidden></span>
     </div>
     <div class="timeline" id="timeline"></div>
     <div class="legend">
@@ -648,7 +660,7 @@ TEMPLATE = r'''<!DOCTYPE html>
       <span data-i18n-html="bl_downS"><i style="background:#4A6076"></i>陡降 低於−8%</span>
     </div>
 
-    <details class="method" id="method">
+    <details class="method" id="method" data-html2canvas-ignore>
       <summary data-i18n="mSummary">這些時刻怎麼算？——834 趟實騎的校準方法</summary>
       <div data-i18n-html="mBody">
       <p>本站的抵達時刻不是理論值，而是從車主 2018–2026 年間以 Brompton 實際完成、記錄於 Komoot 的 939 趟騎乘中校準出來的。剔除非單車活動、短於 3 公里或缺時間戳的紀錄後，留下 <b>834 趟、約 31,790 公里、六百二十萬個軌跡點</b>。</p>
@@ -657,7 +669,7 @@ TEMPLATE = r'''<!DOCTYPE html>
       <p>交叉驗證：全庫算得的平路有效速度 16.3 km/h，與另一趟獨立實騎量得、並通過沿線抵達時刻三分鐘誤差檢驗的 16.2 幾乎重合；各爬坡帶亦互相印證。唯一例外是極陡帶，樣本僅 29 公里且受高程雜訊污染，故採保守值。各帶數值見頁尾；每點停留時間由上方欄位另行輸入，不混入配速。</p></div>
     </details>
 
-    <footer class="colophon" data-i18n-html="colophon"></footer>
+    <footer class="colophon" data-i18n-html="colophon" data-html2canvas-ignore></footer>
   </div>
 
 <script>
@@ -1046,7 +1058,7 @@ function renderRoute(){
       }
       const cvId="cv"+i;
       const stepsHtml = S.steps && S.steps.length
-        ? `<button class="steps-tg" data-tg="st${i}">${tx('steps')(S.steps.length)}</button>
+        ? `<button class="steps-tg" data-tg="st${i}" data-html2canvas-ignore>${tx('steps')(S.steps.length)}</button>
            <ul class="steps-list" id="st${i}" hidden>${S.steps.map(s=>`<li>${s.instruction}${s.distance?` <span style="color:var(--muted)">· ${s.distance>=1000?(s.distance/1000).toFixed(1)+" km":s.distance+" m"}</span>`:""}</li>`).join("")}</ul>`
         : "";
       seg.innerHTML=`<div class="tseg__inner">${head}${gradeHtml}${gradeWarn}${supHtml(S)}`
@@ -1111,6 +1123,12 @@ zh:{
  noteLive:"路徑／坡度／撤退依真實路網計算；天氣接 CWA 鄉鎮逐3小時預報（未設金鑰或超出預報範圍時退 Open-Meteo／示範情境，來源如實標示）",
  disclaim:"⚠ 路線、坡度、天氣皆為<b>推估</b>：實際狀況因所選路段、地形與季節變化甚大，本分析僅供行前參考，出發前後請以現場路況與官方資訊為準，並自負騎乘安全。",
  gpxBtn:"下載 GPX", gmapsBtn:"在 Google 地圖開啟導航",
+ pdfBtn:"下載 PDF 報告", pdfLoading:"載入 PDF 工具中…", pdfWorking:(i,n)=>`製作 PDF 中… ${i}/${n}`,
+ pdfDone:"PDF 已下載。", pdfFail:e=>`PDF 製作失敗（${e}）。請稍後再試，或改用瀏覽器的「列印 → 另存為 PDF」。`,
+ pdfTitle:"小布路書 · 騎乘分析報告", pdfMeta:(d,t,dw)=>`出發 ${d} ${t} · 每點停留 ${dw} 分鐘`,
+ pdfGen:(ts,v)=>`報告產生於 ${ts} · 小布路書 ${v} · 路線、坡度與天氣皆為行前推估`,
+ pdfNoTiles:"底圖未能載入，僅繪出路線與標記", pdfFoot:(a,b)=>`小布路書 · ${a} → ${b}`,
+ supHide:"隱藏補給點", supShow:"顯示補給點",
  lg_yi:'<i style="background:var(--good)"></i>宜', lg_warn:'<i style="background:var(--warn)"></i>留意', lg_risk:'<i style="background:var(--risk)"></i>審慎',
  lg_note:"頂風＝逆風而行 · 順風＝風助前進 · 轉進＝就近搭車撤退",
  bandsK:"坡度分級（每前進 100 公尺的高度變化）",
@@ -1120,7 +1138,7 @@ zh:{
  bl_downS:'<i style="background:#4A6076"></i>陡降 低於−8%',
  mSummary:"這些時刻怎麼算？——834 趟實騎的校準方法",
  mBody:"<p>本站的抵達時刻不是理論值，而是從車主 2018–2026 年間以 Brompton 實際完成、記錄於 Komoot 的 939 趟騎乘中校準出來的。剔除非單車活動、短於 3 公里或缺時間戳的紀錄後，留下 <b>834 趟、約 31,790 公里、六百二十萬個軌跡點</b>。</p><p>每條軌跡先做高程清理：沿線以 ±100 公尺視窗中位數濾波去除尖刺，再每 30 公尺重取樣、±60 公尺移動平均平滑；坡度取 ±50 公尺視窗的高差比，據此把每一小段歸入七個坡度帶——陡降（≤−8%）、下坡、平路（−2〜2%）、緩坡、陡坡、很陡、極陡（&gt;12%）。</p><p>速度統計剔除近乎靜止（&lt;1.5 km/h）、GPS 突跳（&gt;80 km/h）與錄製斷點（相鄰點時距 ≥10 秒的橋接段）後，各帶採<b>有效速度＝Σ距離 ÷ Σ移動時間</b>——而非平均巡航速度：慢的路段按時間放大權重，算出來的才是「抵達時刻」真正需要的數字。樣本以近 24 個月為主，不足的帶回退全庫。</p><p>交叉驗證：全庫算得的平路有效速度 16.3 km/h，與另一趟獨立實騎量得、並通過沿線抵達時刻三分鐘誤差檢驗的 16.2 幾乎重合；各爬坡帶亦互相印證。唯一例外是極陡帶，樣本僅 29 公里且受高程雜訊污染，故採保守值。各帶數值見頁尾；每點停留時間由上方欄位另行輸入，不混入配速。</p>",
- colophon:'<b>小布路書</b> · Brompton Roadbook（原「單車騎行農民曆」）· 版本 <b>v2.7</b>（2026-10-18）<br>© 2026 Chang Chun-Yen · HEALS Design · 版權所有，未經授權請勿轉載<br>路線、坡度、天氣皆為推估，僅供參考；騎乘安全請自行評估。<br>路線距離＝直線距離 × 1.3 迂迴係數；爬升＝海拔差 + 每公里起伏估算；ETA 依坡度分段配速（平路16.3・緩坡12・陡坡8.2・很陡6.6・極陡4.5・下坡21.2・陡降19.7 km/h，2024–2026 Komoot 834 趟完騎有效速度校準）與每點停留推算；頂／順風由每段方位角與當時風向相減。<br>地名座標來自 Open-Meteo Geocoding 與 OpenStreetMap Nominatim、海拔來自 Open-Meteo；天氣為示範情境，實際以出發當日之逐時預報與現場風雨為準。',
+ colophon:'<b>小布路書</b> · Brompton Roadbook（原「單車騎行農民曆」）· 版本 <b>v2.7.1</b>（2026-10-18）<br>© 2026 Chang Chun-Yen · HEALS Design · 版權所有，未經授權請勿轉載<br>路線、坡度、天氣皆為推估，僅供參考；騎乘安全請自行評估。<br>路線距離＝直線距離 × 1.3 迂迴係數；爬升＝海拔差 + 每公里起伏估算；ETA 依坡度分段配速（平路16.3・緩坡12・陡坡8.2・很陡6.6・極陡4.5・下坡21.2・陡降19.7 km/h，2024–2026 Komoot 834 趟完騎有效速度校準）與每點停留推算；頂／順風由每段方位角與當時風向相減。<br>地名座標來自 Open-Meteo Geocoding 與 OpenStreetMap Nominatim、海拔來自 Open-Meteo；天氣為示範情境，實際以出發當日之逐時預報與現場風雨為準。',
  todayTerm:"今日節氣", yiChar:"宜", jiChar:"忌",
  emptyRoute:"打字搜尋地點、從清單挑選加入（或點熱門騎點）；湊滿兩點、設好出發時間與停留，按「開始分析」讀今天這條路線的天時。",
  statusGood:"今日宜騎", statusWarn:"可騎 · 留意時段", statusRisk:"審慎 · 有挑戰路段",
@@ -1152,7 +1170,9 @@ zh:{
  mlgWpK:"路點與騎乘順序",
  mlgWpD:"圖釘上的數字是騎乘順序，與上方路點籤對應（按「反轉方向」時順序隨之重排）：綠色是起點、紅色是途經點、黑色是終點。起點與終點相同的環線會合成一枚，標成「1·8」這樣。點一下圖釘可看地名。",
  mlgSupK:"沿線補給點",
- mlgSupD:(n,gap)=>`購物袋＝便利商店、水滴＝飲水機或給水站、WC＝公廁；取路線兩側約 400 公尺內、OpenStreetMap 有登錄者，涵蓋程度因地而異。為免遮住路線，縮小檢視時每一類約每 ${gap} 公里只標一處代表點；放大到可看清巷道的街區層級，才會顯示全部 ${n} 處。各段數量見下方時間軸的「補給」列，點一下圖釘可看店名。`,
+ mlgSupD:(n)=>`沿線補給點共 ${n} 處，全部標在地圖上。縮小檢視時是小圓點：紫＝便利商店、藍＝飲水機或給水站、深灰＝公廁；放大到看得清巷道的街區層級，會換成圖示：購物袋＝便利商店、水滴＝飲水、WC＝公廁。範圍是路線兩側約 400 公尺內、OpenStreetMap 有登錄者，涵蓋程度因地而異。點一下圓點或圖示可看店名；各段數量見下方時間軸的「補給」列。`,
+ mlgSupTgD:"點太多擋住路線時，可按下方按鈕暫時隱藏。",
+ mlgSupOff:"目前已隱藏，按「顯示補給點」即可重新標回地圖。",
  mlgSupCap:"市區補給點非常密集，單次查詢以 350 處為上限，因此數字後的「+」表示實際只多不少。",
  mlgSupNone:"沿線未查到登錄在 OpenStreetMap 的補給點，因此地圖上沒有補給圖釘。",
  mlgSupFail:"補給點查詢這次未回應，地圖上暫無補給圖釘；稍後重按「開始分析」即可補上。",
@@ -1215,6 +1235,12 @@ en:{
  noteLive:"Routes, grades and bail-outs use the real road network; weather uses CWA township 3-hourly forecasts (falls back to Open-Meteo / demo when no key or out of range — source always shown).",
  disclaim:"⚠ Routes, grades and weather are <b>estimates</b>: real conditions vary greatly with roads, terrain and season. This analysis is for planning only — check conditions and official forecasts before and during your ride, and ride at your own risk.",
  gpxBtn:"Download GPX", gmapsBtn:"Open in Google Maps",
+ pdfBtn:"Download PDF report", pdfLoading:"Loading PDF tools…", pdfWorking:(i,n)=>`Building PDF… ${i}/${n}`,
+ pdfDone:"PDF downloaded.", pdfFail:e=>`Could not build the PDF (${e}). Try again later, or use your browser’s Print → Save as PDF.`,
+ pdfTitle:"Brompton Roadbook · Ride analysis report", pdfMeta:(d,t,dw)=>`Start ${d} ${t} · ${dw} min at each stop`,
+ pdfGen:(ts,v)=>`Generated ${ts} · Brompton Roadbook ${v} · route, gradients and weather are pre-ride estimates`,
+ pdfNoTiles:"The base map could not be loaded; only the route and markers are drawn", pdfFoot:(a,b)=>`Brompton Roadbook · ${a} → ${b}`,
+ supHide:"Hide supply points", supShow:"Show supply points",
  lg_yi:'<i style="background:var(--good)"></i>Good', lg_warn:'<i style="background:var(--warn)"></i>Caution', lg_risk:'<i style="background:var(--risk)"></i>Care',
  lg_note:"Headwind = riding into the wind · Tailwind = wind at your back · Bail-out = nearest station retreat",
  bandsK:"Grade bands (elevation change per 100 m travelled)",
@@ -1224,7 +1250,7 @@ en:{
  bl_downS:'<i style="background:#4A6076"></i>Steep down <−8%',
  mSummary:"How are these times computed? — calibrated on 834 real rides",
  mBody:"<p>Arrival times here are not theoretical. They are calibrated from 939 rides the owner actually completed on a Brompton between 2018–2026, recorded on Komoot. After removing non-cycling activities, rides under 3 km, and files without timestamps, <b>834 rides remain — about 31,790 km and 6.2 million track points</b>.</p><p>Each track first gets elevation cleaning: a ±100 m median filter along the line removes spikes, then 30 m resampling and a ±60 m moving average smooth the profile; grade is taken over a ±50 m window, and every short segment is assigned to one of seven bands — steep descent (≤−8%), downhill, flat (−2〜2%), gentle, steep, very steep, extreme (&gt;12%).</p><p>After excluding near-standstill samples (&lt;1.5 km/h), GPS spikes (&gt;80 km/h) and recording gaps (bridged segments with ≥10 s between points), each band uses <b>effective speed = Σdistance ÷ Σmoving time</b> — not average cruising speed: slow stretches are weighted by time, which is exactly what an arrival time needs. Samples favour the last 24 months, falling back to the full library where thin.</p><p>Cross-check: the library-wide flat effective speed of 16.3 km/h almost exactly matches 16.2 measured independently on a single ride that passed a 3-minute arrival-time test; climbing bands corroborate each other likewise. The one exception is the extreme band — only 29 km of noisy samples — so a conservative value is used. Band values are in the footer; stop time per waypoint is entered above and never mixed into pace.</p>",
- colophon:'<b>小布路書</b> · Xiaobu Roadbook — a Brompton Roadbook (formerly “A Cyclist’s Almanac”) · Version <b>v2.7</b> (2026-10-18)<br>© 2026 Chang Chun-Yen · HEALS Design · All rights reserved<br>Routes, grades and weather are estimates for reference only; assess riding safety yourself.<br>Fallback route length = straight-line × 1.3; climb = elevation gap + per-km undulation. ETA uses graded pace (flat 16.3 · gentle 12 · steep 8.2 · v-steep 6.6 · extreme 4.5 · down 21.2 · steep-down 19.7 km/h, effective speeds calibrated on 834 Komoot rides 2024–2026) plus stop time per waypoint; head/tailwind from segment bearing vs. hourly wind.<br>Geocoding by Open-Meteo Geocoding & OpenStreetMap Nominatim; elevation by Open-Meteo. Demo weather is illustrative — trust the day’s forecast and conditions on the road.',
+ colophon:'<b>小布路書</b> · Xiaobu Roadbook — a Brompton Roadbook (formerly “A Cyclist’s Almanac”) · Version <b>v2.7.1</b> (2026-10-18)<br>© 2026 Chang Chun-Yen · HEALS Design · All rights reserved<br>Routes, grades and weather are estimates for reference only; assess riding safety yourself.<br>Fallback route length = straight-line × 1.3; climb = elevation gap + per-km undulation. ETA uses graded pace (flat 16.3 · gentle 12 · steep 8.2 · v-steep 6.6 · extreme 4.5 · down 21.2 · steep-down 19.7 km/h, effective speeds calibrated on 834 Komoot rides 2024–2026) plus stop time per waypoint; head/tailwind from segment bearing vs. hourly wind.<br>Geocoding by Open-Meteo Geocoding & OpenStreetMap Nominatim; elevation by Open-Meteo. Demo weather is illustrative — trust the day’s forecast and conditions on the road.',
  todayTerm:"Today's solar term", yiChar:"Do", jiChar:"Skip",
  emptyRoute:"Type to search and pick places (or tap a popular spot); with two or more set, choose your start time and stops, then press Analyze.",
  statusGood:"A good day to ride", statusWarn:"Rideable · mind the timing", statusRisk:"Ride with care · challenging section",
@@ -1256,7 +1282,9 @@ en:{
  mlgWpK:"Waypoints and riding order",
  mlgWpD:"The number on each pin is the riding order and matches the waypoint chips above (it re-orders when you press Reverse direction): green is the start, red a via point, black the finish. On a loop where start and finish coincide they merge into one pin labelled like “1·8”. Tap a pin to see its name.",
  mlgSupK:"Supply points along the route",
- mlgSupD:(n,gap)=>`Bag = convenience store, droplet = drinking water, WC = public toilet — those mapped in OpenStreetMap within about 400 m of the route, so coverage varies by place. To keep the route visible, the zoomed-out map shows one representative of each kind roughly every ${gap} km; zoom in to street level to see all ${n}. Counts per leg are in the timeline’s “Supplies” line; tap a pin for its name.`,
+ mlgSupD:(n)=>`All ${n} supply points along the route are on the map. Zoomed out they are small dots — purple = convenience store, blue = drinking water, dark grey = public toilet; zoom in to street level and they become icons — bag = convenience store, droplet = water, WC = toilet. They are the ones mapped in OpenStreetMap within about 400 m of the route, so coverage varies by place. Tap a dot or icon for its name; counts per leg are in the timeline’s “Supplies” line.`,
+ mlgSupTgD:" If they crowd the route, hide them with the button below.",
+ mlgSupOff:" They are hidden right now — press “Show supply points” to put them back.",
  mlgSupCap:" Supply points are so dense here that one lookup is capped at 350, so a “+” after a number means there are at least that many.",
  mlgSupNone:"No supply points are mapped in OpenStreetMap along this route, so the map shows none.",
  mlgSupFail:"The supply lookup did not respond this time, so the map shows no supply pins; press Analyze again later to add them.",
@@ -1319,6 +1347,12 @@ ja:{
  noteLive:"ルート／勾配／退避は実路網で計算。天気は CWA 郷鎮3時間予報（キー未設定・範囲外は Open-Meteo／デモにフォールバック。出典は常に表示）",
  disclaim:"⚠ ルート・勾配・天気はすべて<b>推定</b>です。実際の状況は道路・地形・季節で大きく変わります。本分析は計画の参考用であり、出発前後は現地の状況と公式予報を優先し、安全は自己責任でお願いします。",
  gpxBtn:"GPX をダウンロード", gmapsBtn:"Google マップで開く",
+ pdfBtn:"PDF レポートを保存", pdfLoading:"PDF ツールを読み込み中…", pdfWorking:(i,n)=>`PDF 作成中… ${i}/${n}`,
+ pdfDone:"PDF を保存しました。", pdfFail:e=>`PDF を作成できませんでした（${e}）。時間をおいて再試行するか、ブラウザの「印刷 → PDF に保存」をお使いください。`,
+ pdfTitle:"小布路書 · ライド分析レポート", pdfMeta:(d,t,dw)=>`出発 ${d} ${t} · 各地点の滞在 ${dw} 分`,
+ pdfGen:(ts,v)=>`作成 ${ts} · 小布路書 ${v} · ルート・勾配・天気はいずれも事前の推定です`,
+ pdfNoTiles:"背景地図を読み込めなかったため、ルートと記号のみ描画しています", pdfFoot:(a,b)=>`小布路書 · ${a} → ${b}`,
+ supHide:"補給ポイントを隠す", supShow:"補給ポイントを表示",
  lg_yi:'<i style="background:var(--good)"></i>宜', lg_warn:'<i style="background:var(--warn)"></i>注意', lg_risk:'<i style="background:var(--risk)"></i>慎重',
  lg_note:"向かい風＝風に逆らう · 追い風＝風が押す · 退避＝最寄り駅へ離脱",
  bandsK:"勾配区分（100 m 進むごとの高度変化）",
@@ -1328,7 +1362,7 @@ ja:{
  bl_downS:'<i style="background:#4A6076"></i>急降 −8%未満',
  mSummary:"この到着時刻はどう計算？——実走834本による校正",
  mBody:"<p>本サイトの到着時刻は理論値ではありません。オーナーが 2018–2026 年に Brompton で実際に完走し Komoot に記録した 939 本の走行から校正されています。自転車以外・3 km 未満・タイムスタンプ欠落を除き、<b>834 本・約 31,790 km・620 万トラックポイント</b>が残りました。</p><p>各トラックはまず標高クリーニング：沿線 ±100 m の中央値フィルタでスパイクを除去し、30 m ごとに再サンプル、±60 m 移動平均で平滑化。勾配は ±50 m 窓で取り、各区間を七つの帯——急降（≤−8%）・下り・平坦（−2〜2%）・緩坂・急坂・激坂・極坂（&gt;12%）——に振り分けます。</p><p>ほぼ静止（&lt;1.5 km/h）、GPS スパイク（&gt;80 km/h）、記録ギャップ（隣接点間 ≥10 秒のブリッジ区間）を除外した上で、各帯は<b>有効速度＝Σ距離 ÷ Σ移動時間</b>を採用——平均巡航速度ではありません。遅い区間ほど時間で重みが増し、それこそが「到着時刻」に必要な数字です。標本は直近 24 か月を主とし、不足帯は全期間で補完。</p><p>相互検証：全データの平坦有効速度 16.3 km/h は、独立した一本の実走で測られ沿線到着 3 分誤差の検証を通った 16.2 とほぼ一致。登坂帯も互いに整合します。唯一の例外は極坂帯（標本 29 km・ノイズ混入）で、保守値を採用。各帯の値はフッター参照。各地点の滞在時間は上の欄で別入力され、ペースには混ぜません。</p>",
- colophon:'<b>小布路書</b> · ブロンプトン・ロードブック（旧「単車騎行農民暦」）· バージョン <b>v2.7</b>（2026-10-18）<br>© 2026 Chang Chun-Yen · HEALS Design · 無断転載を禁じます<br>ルート・勾配・天気は推定であり参考情報です。走行の安全はご自身で判断してください。<br>簡易時：距離＝直線 × 1.3、獲得標高＝標高差＋km あたり起伏。ETA は勾配別ペース（平坦16.3・緩坂12・急坂8.2・激坂6.6・極坂4.5・下り21.2・急降19.7 km/h、2024–2026 Komoot 実走834本の有効速度で校正）と各地点滞在から算出。向かい風／追い風は区間方位と毎時風向の差。<br>地名は Open-Meteo Geocoding と OpenStreetMap Nominatim、標高は Open-Meteo。デモ天気は例示であり、当日の予報と現地の風雨を優先してください。',
+ colophon:'<b>小布路書</b> · ブロンプトン・ロードブック（旧「単車騎行農民暦」）· バージョン <b>v2.7.1</b>（2026-10-18）<br>© 2026 Chang Chun-Yen · HEALS Design · 無断転載を禁じます<br>ルート・勾配・天気は推定であり参考情報です。走行の安全はご自身で判断してください。<br>簡易時：距離＝直線 × 1.3、獲得標高＝標高差＋km あたり起伏。ETA は勾配別ペース（平坦16.3・緩坂12・急坂8.2・激坂6.6・極坂4.5・下り21.2・急降19.7 km/h、2024–2026 Komoot 実走834本の有効速度で校正）と各地点滞在から算出。向かい風／追い風は区間方位と毎時風向の差。<br>地名は Open-Meteo Geocoding と OpenStreetMap Nominatim、標高は Open-Meteo。デモ天気は例示であり、当日の予報と現地の風雨を優先してください。',
  todayTerm:"今日の節気", yiChar:"宜", jiChar:"忌",
  emptyRoute:"地名を入力して候補から追加（人気スポットのタップでも可）。2 地点以上そろえ、出発時刻と滞在を設定したら「分析開始」で天時を読みます。",
  statusGood:"本日、走るに宜し", statusWarn:"走行可 · 時間帯に注意", statusRisk:"慎重に · 難所あり",
@@ -1360,7 +1394,9 @@ ja:{
  mlgWpK:"地点と走行順",
  mlgWpD:"ピンの数字は走行順で、上の地点チップと対応します（「方向を反転」を押すと並びも入れ替わります）。緑はスタート、赤は経由地、黒はゴールです。スタートとゴールが同じ周回ルートでは 1 本にまとめ「1·8」のように表示します。ピンをタップすると地名が見られます。",
  mlgSupK:"沿線の補給ポイント",
- mlgSupD:(n,gap)=>`買い物袋＝コンビニ、しずく＝給水所・水飲み場、WC＝公衆トイレ。ルートの両側およそ 400 m 以内で OpenStreetMap に登録されたものを表示するため、網羅度は地域によって異なります。ルートが隠れないよう、縮小表示では種類ごとにおよそ ${gap} km おきに代表 1 か所のみ表示し、路地が見える街区レベルまで拡大すると全 ${n} か所を表示します。区間ごとの数は下のタイムラインの「補給」行に、店名はピンのタップで確認できます。`,
+ mlgSupD:(n)=>`沿線の補給ポイント全 ${n} か所をすべて地図に表示しています。縮小表示では小さな丸印で、紫＝コンビニ、青＝給水所・水飲み場、濃い灰色＝公衆トイレ。路地が見える街区レベルまで拡大すると、アイコン（買い物袋＝コンビニ、しずく＝給水、WC＝トイレ）に切り替わります。ルートの両側およそ 400 m 以内で OpenStreetMap に登録されたものなので、網羅度は地域によって異なります。丸印やアイコンをタップすると店名を、区間ごとの数は下のタイムラインの「補給」行で確認できます。`,
+ mlgSupTgD:"ルートが見えにくいときは下のボタンで一時的に隠せます。",
+ mlgSupOff:"現在は非表示です。「補給ポイントを表示」で地図に戻せます。",
  mlgSupCap:"市街地では補給ポイントが非常に多いため 1 回の検索は 350 か所が上限です。数字の後の「+」は実際にはそれ以上あることを示します。",
  mlgSupNone:"沿線に OpenStreetMap 登録の補給ポイントが見つからなかったため、地図には表示していません。",
  mlgSupFail:"今回は補給ポイントの検索が応答しなかったため、地図に補給ピンはありません。しばらくして「分析開始」を押し直すと追加されます。",
@@ -2270,9 +2306,14 @@ function gradeColor(g){
   if(g<-2) return "#8FA0B5";        // 下坡
   return g<=2?"#5FA046" : g<=5?"#B08A3E" : g<=8?"#CE8418" : g<=12?"#BE5027" : "#8C2318";
 }
+var XB_ELEV={};
 function drawElev(id, gr, steps){
   const cv=document.getElementById(id); if(!cv) return;
-  const W=cv.clientWidth||600, H=72; cv.width=W*2; cv.height=H*2;
+  XB_ELEV[id]={gr, steps};
+  drawElevOn(cv, cv.clientWidth||600, gr, steps);
+}
+function drawElevOn(cv, W, gr, steps){
+  const H=72; cv.width=W*2; cv.height=H*2;
   const ctx=cv.getContext('2d'); ctx.scale(2,2);
   const P=gr.profile, T=gr.total;
   let mn=Infinity,mx=-Infinity,pi=0;
@@ -2327,21 +2368,31 @@ function drawElev(id, gr, steps){
     });
   }
 }
-// ---------- 地圖符號（v2.7）：路點序號圖釘、補給圖釘分層、地圖圖例 ----------
-var SUPOVER=null, SUPDETAIL=null, XB_ZOOM_HOOKED=false, XB_SUP_GAP=0, XB_MAPST=null;
-var XB_SUP_ZOOM=15;   // 放大到此層級（約可看清巷道）才顯示全部補給點
+// ---------- 地圖符號（v2.7.1）：路點序號圖釘、補給點（全部標示）、地圖圖例 ----------
+var SUPDOTS=null, SUPPINS=null, XB_ZOOM_HOOKED=false, XB_MAPST=null;
+var XB_SUP_ZOOM=15;   // 放大到此層級（約可看清巷道）時，補給小圓點換成圖示
+var XB_SUP_COL={store:'#8B4C7E', water:'#2F6E9E', toilet:'#3F3A35'};   // 紫＝超商、藍＝飲水、深灰＝公廁（避開七種坡度色）
+var XB_SUP_SHOW=(()=>{ try{ return localStorage.getItem('xb_sup_show')!=='0'; }catch(e){ return true; } })();
+var XB_SUP_DOTICON={};
 function xbSupZoom(){
   if(!MAP) return;
   const near = MAP.getZoom() >= XB_SUP_ZOOM;
-  [[SUPOVER,!near],[SUPDETAIL,near]].forEach(([lg,on])=>{
+  MAP.getContainer().classList.toggle('xb-sup-sm', MAP.getZoom() <= 12);
+  [[SUPDOTS, XB_SUP_SHOW && !near],[SUPPINS, XB_SUP_SHOW && near]].forEach(([lg,on])=>{
     if(!lg) return;
     if(on && !MAP.hasLayer(lg)) lg.addTo(MAP);
     if(!on && MAP.hasLayer(lg)) MAP.removeLayer(lg);
   });
 }
 function xbSupClear(){
-  if(MAP){ [SUPOVER,SUPDETAIL].forEach(lg=>{ if(lg && MAP.hasLayer(lg)) MAP.removeLayer(lg); }); }
-  SUPOVER=null; SUPDETAIL=null;
+  if(MAP){ [SUPDOTS,SUPPINS].forEach(lg=>{ if(lg && MAP.hasLayer(lg)) MAP.removeLayer(lg); }); }
+  SUPDOTS=null; SUPPINS=null;
+}
+function xbSupToggle(){
+  XB_SUP_SHOW=!XB_SUP_SHOW;
+  try{ localStorage.setItem('xb_sup_show', XB_SUP_SHOW?'1':'0'); }catch(e){}
+  xbSupZoom();
+  if(XB_MAPST) renderMapLegend(XB_MAPST);
 }
 function xbSupGlyph(k){
   if(k==='store') return '<path d="M4.6 7.4h8.8l-.9 7.6H5.5z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M6.7 7.4V6a2.3 2.3 0 0 1 4.6 0v1.4" fill="none" stroke="currentColor" stroke-width="1.7"/>';
@@ -2349,22 +2400,42 @@ function xbSupGlyph(k){
   return '<text x="9" y="12.4" text-anchor="middle" font-size="7.8" font-weight="700" font-family="Arial,Helvetica,sans-serif" fill="currentColor">WC</text>';
 }
 function xbSupPinHtml(k){ return `<svg viewBox="0 0 18 18" aria-hidden="true">${xbSupGlyph(k)}</svg>`; }
-function xbSupIcon(k, small){
-  const z = small ? 15 : 19;
+function xbSupIcon(k){
+  const z = 18;
   // 同一地點常同時有超商、飲水、公廁：三類左右錯開（超商偏左、公廁偏右），不疊成一顆
   const dx = k==='store' ? Math.round(z*0.55) : k==='toilet' ? -Math.round(z*0.55) : 0;
-  return L.divIcon({className:'sup-pin sup-'+k+(small?' sup-sm':''), html:xbSupPinHtml(k), iconSize:[z,z], iconAnchor:[z/2+dx,z/2]});
+  return L.divIcon({className:'sup-pin sup-'+k, html:xbSupPinHtml(k), iconSize:[z,z], iconAnchor:[z/2+dx,z/2]});
 }
-function xbSupThin(nodes, gapKm){
-  // 同一類補給相隔至少 gapKm 才再標一處，避免市區上百個圖釘蓋住路線
-  const lastAt={}, out=[];
-  nodes.forEach(n=>{ if(lastAt[n.k]==null || Math.abs(n.at-lastAt[n.k])>=gapKm){ lastAt[n.k]=n.at; out.push(n); } });
-  return out;
-}
-function xbSupMarker(n, small){
+function xbSupTip(n){
   const lbl = n.k==='store'?tx('supStore'):n.k==='water'?tx('supWater'):tx('supToilet');
-  return L.marker([n.lat,n.lng],{icon:xbSupIcon(n.k,small), keyboard:false, zIndexOffset:small?0:100})
-    .bindTooltip(`${lbl}${n.nm?` · ${xml(n.nm)}`:''}`,{direction:'top',offset:[0,-8]});
+  return `${lbl}${n.nm?` · ${xml(n.nm)}`:''}`;
+}
+function xbSupDot(n){
+  // 縮小檢視：每一處補給都是一顆小圓點（9px 色點、16px 點擊區，手機也點得到）
+  const k = XB_SUP_COL[n.k] ? n.k : 'toilet';
+  const ic = XB_SUP_DOTICON[k] || (XB_SUP_DOTICON[k]=L.divIcon({className:'sup-dotm sup-'+k, html:'', iconSize:[16,16], iconAnchor:[8,8]}));
+  return L.marker([n.lat,n.lng],{icon:ic, keyboard:false})
+    .bindTooltip(xbSupTip(n),{direction:'top',offset:[0,-5]});
+}
+function xbSupMarker(n){
+  // 放大到街區層級：換成圖示（購物袋／水滴／WC）
+  return L.marker([n.lat,n.lng],{icon:xbSupIcon(n.k), keyboard:false, zIndexOffset:100})
+    .bindTooltip(xbSupTip(n),{direction:'top',offset:[0,-8]});
+}
+function xbGradePieces(seg){
+  // 依原始幾何自身的累積距離切片，逐段以坡度著色（剖面重取樣後索引不再對齊原始幾何，故以距離對齊）
+  const g=seg.geom, out=[];
+  if(!g || !seg.grades) return out;
+  const rawD=[0];
+  for(let i=1;i<g.length;i++) rawD[i]=rawD[i-1]+haversine({lat:g[i-1][1],lng:g[i-1][0]},{lat:g[i][1],lng:g[i][0]})*1000;
+  let idx=0, last=null;
+  seg.grades.samples.forEach(sm=>{
+    const line=[]; if(last) line.push(last);
+    while(idx<g.length && rawD[idx]<=sm.d1){ line.push([g[idx][1],g[idx][0]]); idx++; }
+    if(line.length>1){ out.push({line, col:gradeColor(sm.g)}); last=line[line.length-1]; }
+    else if(line.length===1){ last=line[0]; }
+  });
+  return out;
 }
 function xbWpGroups(pts){
   // 起終點相同的環線、或幾乎重疊的兩個路點，合成一枚圖釘（標示「1·8」）
@@ -2405,19 +2476,9 @@ function renderMap(){
       if(seg.eleApprox) nEleApprox++;
       // 白色描邊：讓坡度色線在繁忙的底圖上仍清楚可辨（僅為襯底，無其他意義）
       L.polyline(ll,{color:'#FFFFFF',weight:7.5,opacity:.85,interactive:false}).addTo(MAPLAYER);
-      // 依原始幾何自身的累積距離切片，逐段以坡度著色（修正：剖面重取樣後索引不再對齊原始幾何）
-      const rawD=[0];
-      for(let i=1;i<g.length;i++) rawD[i]=rawD[i-1]+haversine({lat:g[i-1][1],lng:g[i-1][0]},{lat:g[i][1],lng:g[i][0]})*1000;
-      let idx=0, last=null;
-      seg.grades.samples.forEach(sm=>{
-        const line=[]; if(last) line.push(last);
-        while(idx<g.length && rawD[idx]<=sm.d1){
-          line.push([g[idx][1],g[idx][0]]); all.push([g[idx][1],g[idx][0]]); idx++;
-        }
-        if(line.length>1){
-          L.polyline(line,{color:gradeColor(sm.g),weight:4,opacity:.95}).addTo(MAPLAYER);
-          last=line[line.length-1];
-        } else if(line.length===1){ last=line[0]; }
+      xbGradePieces(seg).forEach(pc=>{
+        pc.line.forEach(x=>all.push(x));
+        L.polyline(pc.line,{color:pc.col,weight:4,opacity:.95}).addTo(MAPLAYER);
       });
     }else{
       nEst++;
@@ -2437,13 +2498,10 @@ function renderMap(){
       .bindTooltip(tip,{direction:'top',offset:[0,-10]}).addTo(MAPLAYER);
     all.push([G.p.lat,G.p.lng]);
   });
-  // 補給：縮小時只標代表點，放大到街區層級才顯示全部
-  const totalKm=SEGDATA.reduce((a,s)=>a+(s.dist||0),0);
-  XB_SUP_GAP = Math.min(6, Math.max(1.5, totalKm/12));
+  // 補給：每一處都標——縮小時是小圓點，放大到街區層級換成圖示；圖例裡可暫時隱藏
   if(SUPPLY.length){
-    SUPOVER=L.layerGroup(); SUPDETAIL=L.layerGroup();
-    xbSupThin(SUPPLY, XB_SUP_GAP).forEach(n=>xbSupMarker(n,false).addTo(SUPOVER));
-    SUPPLY.forEach(n=>xbSupMarker(n,true).addTo(SUPDETAIL));
+    SUPDOTS=L.layerGroup(); SUPPINS=L.layerGroup();
+    SUPPLY.forEach(n=>{ xbSupDot(n).addTo(SUPDOTS); xbSupMarker(n).addTo(SUPPINS); });
   }
   if(all.length) MAP.fitBounds(all,{padding:[24,24]});
   xbSupZoom();
@@ -2466,7 +2524,7 @@ function renderMapLegend(st){
     +'<path d="M45 14.5L49.5 5.5L54 14.5Z" fill="#C77E4D"/><path d="M38 16.5L62 16.5" stroke="#E892A2" stroke-width="2.4"/></svg>';
   const pin=(t,k)=>`<span class="wp-pin wp-${k}">${t}</span>`;
   const sp=k=>`<span class="sup-pin sup-${k}">${xbSupPinHtml(k)}</span>`;
-  const row=(sym,h,d,extra)=>`<div class="mlg__row"><span class="mlg__sym">${sym}</span><div><span class="mlg__h">${h}</span>${extra||''}<p class="mlg__d">${d}</p></div></div>`;
+  const row=(sym,h,d,extra,after)=>`<div class="mlg__row"><span class="mlg__sym">${sym}</span><div><span class="mlg__h">${h}</span>${extra||''}<p class="mlg__d">${d}</p>${after||''}</div></div>`;
   const rows=[];
   rows.push(row(gradSym, tx('mlgRouteK'), tx('mlgRouteD'),
     `<span class="mlg__list">${bands.map(([c,k])=>`<span><i style="background:${c}"></i>${strip(tx(k))}</span>`).join('')}</span>`));
@@ -2477,18 +2535,300 @@ function renderMapLegend(st){
   rows.push(row(wpSyms, tx('mlgWpK'), tx('mlgWpD')));
   if(SUPPLY.length){
     const c={store:0,water:0,toilet:0}; SUPPLY.forEach(x=>{ c[x.k]=(c[x.k]||0)+1; });
+    const pl=SUP_CAP?'+':'';
+    const dot=k=>`<span class="sup-dot sup-${k}"></span>`;
+    const nm={store:tx('supStore'), water:tx('supWater'), toilet:tx('supToilet')};
     const list=`<span class="mlg__list">`
-      +`<span class="mlg__inl">${sp('store')}${tx('supStore')} ${c.store}${SUP_CAP?'+':''}</span>`
-      +`<span class="mlg__inl">${sp('water')}${tx('supWater')} ${c.water}${SUP_CAP?'+':''}</span>`
-      +`<span class="mlg__inl">${sp('toilet')}${tx('supToilet')} ${c.toilet}${SUP_CAP?'+':''}</span></span>`;
-    rows.push(row(sp('store')+sp('water')+sp('toilet'), tx('mlgSupK'),
-      tx('mlgSupD')(SUPPLY.length, XB_SUP_GAP.toFixed(1)) + (SUP_CAP?tx('mlgSupCap'):''), list));
+      + ['store','water','toilet'].map(k=>`<span class="mlg__inl">${dot(k)}${sp(k)}${nm[k]} ${c[k]}${pl}</span>`).join('')
+      + `</span>`;
+    const tg=`<button type="button" class="mini-btn mlg__tg" id="supTg" data-html2canvas-ignore aria-pressed="${XB_SUP_SHOW?'false':'true'}">${XB_SUP_SHOW?tx('supHide'):tx('supShow')}</button>`;
+    rows.push(row(`<span class="mlg__dots">${dot('store')}${dot('water')}${dot('toilet')}</span>`+sp('store')+sp('water')+sp('toilet'),
+      tx('mlgSupK'), tx('mlgSupD')(SUPPLY.length+pl) + (SUP_CAP?tx('mlgSupCap'):'')
+        + `<span data-html2canvas-ignore>${XB_SUP_SHOW?tx('mlgSupTgD'):tx('mlgSupOff')}</span>`, list, tg));
   }else{
     rows.push(row(sp('store'), tx('mlgSupK'), SUP_FAIL?tx('mlgSupFail'):tx('mlgSupNone')));
   }
   rows.push(row(baseSym, tx('mlgBaseK'), tx('mlgBaseD')));
   box.innerHTML=`<p class="mlg__k">${tx('mlgTitle')}</p>${rows.join('')}`;
   box.hidden=false;
+  const tgb=box.querySelector('#supTg'); if(tgb) tgb.addEventListener('click', xbSupToggle);
+}
+
+// ---------- PDF 報告（v2.7.1）：整份分析存成 A4 PDF ----------
+// 文字區塊以 html2canvas-pro 擷取（支援 color-mix 等新式色彩），地圖另以 canvas 依 Web Mercator 重繪（底圖＋路線＋補給＋路點），
+// jsPDF 排版：A4 直式、紙色底、區塊不跨頁，時間軸在站點／路段交界處換頁。兩個函式庫只在按下按鈕時才載入。
+var XB_VER='v2.7.1', XB_PDF_BUSY=false, XB_PDF_BG='#F3EEE2';
+function xbLoadScript(src){
+  return new Promise((res,rej)=>{
+    const sc=document.createElement('script'); sc.src=src; sc.async=true;
+    sc.onload=()=>res(); sc.onerror=()=>rej(new Error('load '+src));
+    document.head.appendChild(sc);
+  });
+}
+function xbH2C(){ const h=window.html2canvas; return typeof h==='function' ? h : (h && (h.default||h.html2canvas)) || null; }
+async function xbPdfLibs(){
+  const need=[];
+  if(!(window.jspdf && window.jspdf.jsPDF)) need.push(xbLoadScript('vendor/pdf/jspdf.umd.min.js'));
+  if(!xbH2C()) need.push(xbLoadScript('vendor/pdf/html2canvas-pro.min.js'));
+  await Promise.all(need);
+  if(!(window.jspdf && window.jspdf.jsPDF) || !xbH2C()) throw new Error('PDF library');
+}
+async function xbPrepClone(d, el){
+  // 擷取用的複本文件裡，進場動畫會從頭播放（透明度 0）：一律關掉，取最終樣式
+  try{ const st=d.createElement('style'); st.textContent='*,*::before,*::after{animation:none!important;transition:none!important}'; d.head.appendChild(st); }catch(e){}
+  // 高度剖面圖是在手機寬度畫的：依複本（A4 版面）寬度重畫，避免文字被橫向拉長
+  try{ d.querySelectorAll('canvas.elevcv').forEach(c2=>{ const r=XB_ELEV[c2.id], w=c2.clientWidth; if(r && w>0) drawElevOn(c2, w, r.gr, r.steps); }); }catch(e){}
+  // Google 字型依字元分包：先把這個區塊用到的字載進複本，不然會以系統字型代打
+  try{
+    if(d.fonts && d.fonts.load){
+      const chars=[...new Set(((el&&el.textContent)||'').replace(/\s+/g,''))].join('').slice(0,3000) || '小布路書';
+      const loads=['400','500','600','700'].map(w=>d.fonts.load(`${w} 16px "Noto Serif TC"`, chars).catch(()=>null))
+        .concat([d.fonts.load('400 16px "Fraunces"', chars).catch(()=>null), d.fonts.load('600 16px "Fraunces"', chars).catch(()=>null)]);
+      await Promise.race([Promise.all(loads), new Promise(r=>setTimeout(r,3000))]);
+    }
+  }catch(e){}
+}
+function xbRoundRect(c,x,y,w,h,r){
+  c.beginPath(); c.moveTo(x+r,y); c.lineTo(x+w-r,y); c.arcTo(x+w,y,x+w,y+r,r); c.lineTo(x+w,y+h-r);
+  c.arcTo(x+w,y+h,x+w-r,y+h,r); c.lineTo(x+r,y+h); c.arcTo(x,y+h,x,y+h-r,r); c.lineTo(x,y+r); c.arcTo(x,y,x+r,y,r); c.closePath();
+}
+async function xbMapSnapshot(){
+  // 1800×1125 px（約 A4 內容寬 186 mm）；線寬、圖釘以 u＝2 倍螢幕尺寸繪製，印出來與螢幕上的比例相近
+  const W=1800, H=1125, PAD=72, u=W/900;
+  const cv=document.createElement('canvas'); cv.width=W; cv.height=H;
+  const c=cv.getContext('2d');
+  c.fillStyle='#F2EFE9'; c.fillRect(0,0,W,H);
+  const pts = REVERSED ? [...ROUTE].reverse() : ROUTE.slice();
+  const ll=[];
+  SEGDATA.forEach(sg=>(sg.geom||[]).forEach(q=>ll.push([q[1],q[0]])));
+  pts.forEach(p=>ll.push([p.lat,p.lng]));
+  const mx=lng=>(lng+180)/360;
+  const my=lat=>{ const t=Math.sin(Math.max(-85,Math.min(85,lat))*Math.PI/180); return .5-Math.log((1+t)/(1-t))/(4*Math.PI); };
+  let x0=1,x1=0,y0=1,y1=0;
+  ll.forEach(([la,ln])=>{ const X=mx(ln), Y=my(la); if(X<x0)x0=X; if(X>x1)x1=X; if(Y<y0)y0=Y; if(Y>y1)y1=Y; });
+  const S=Math.min((W-2*PAD)/Math.max(x1-x0,1e-9), (H-2*PAD)/Math.max(y1-y0,1e-9), 256*Math.pow(2,17));   // 世界寬（px）
+  const zt=Math.max(1, Math.min(18, Math.round(Math.log2(S/256)-Math.log2(1.6))));   // 圖磚約放大 1.6 倍：地名在紙上仍讀得出來
+  const n=Math.pow(2,zt), ts=S/n;
+  const ox=(x0+x1)/2*S-W/2, oy=(y0+y1)/2*S-H/2;
+  const P=(la,ln)=>[mx(ln)*S-ox, my(la)*S-oy];
+  let ok=0, tot=0;
+  const jobs=[];
+  for(let iy=Math.max(0,Math.floor(oy/ts)); iy<=Math.min(n-1,Math.floor((oy+H)/ts)); iy++){
+    for(let ix=Math.floor(ox/ts); ix<=Math.floor((ox+W)/ts); ix++){
+      tot++;
+      jobs.push(new Promise(res=>{
+        const im=new Image(); let done=false;
+        const fin=good=>{
+          if(done) return; done=true;
+          if(good){ try{ c.drawImage(im, Math.floor(ix*ts-ox), Math.floor(iy*ts-oy), Math.ceil(ts)+1, Math.ceil(ts)+1); ok++; }catch(e){} }
+          res();
+        };
+        im.crossOrigin='anonymous';
+        im.onload=()=>fin(true); im.onerror=()=>fin(false);
+        setTimeout(()=>fin(false), 9000);
+        im.src=`https://tile.openstreetmap.org/${zt}/${((ix%n)+n)%n}/${iy}.png`;
+      }));
+    }
+  }
+  await Promise.all(jobs);
+  c.lineJoin='round'; c.lineCap='round';
+  const trace=line=>{ c.beginPath(); line.forEach((q,i)=>{ const [X,Y]=P(q[0],q[1]); if(i) c.lineTo(X,Y); else c.moveTo(X,Y); }); };
+  SEGDATA.forEach(sg=>{ const g=sg.geom; if(!g||g.length<2) return;
+    trace(g.map(q=>[q[1],q[0]])); c.setLineDash([]); c.strokeStyle='rgba(255,255,255,.88)'; c.lineWidth=7.5*u; c.stroke(); });
+  SEGDATA.forEach(sg=>{ const g=sg.geom; if(!g||g.length<2) return;
+    if(sg.grades){
+      xbGradePieces(sg).forEach(pc=>{ trace(pc.line); c.strokeStyle=pc.col; c.lineWidth=4*u; c.stroke(); });
+    }else{
+      trace(g.map(q=>[q[1],q[0]])); c.setLineDash([10*u,7*u]); c.lineCap='butt';
+      c.strokeStyle='#4D453A'; c.lineWidth=3.4*u; c.stroke(); c.setLineDash([]); c.lineCap='round';
+    }
+  });
+  SUPPLY.forEach(sp=>{
+    const [X,Y]=P(sp.lat,sp.lng);
+    c.beginPath(); c.arc(X,Y,3.6*u,0,Math.PI*2);
+    c.fillStyle=XB_SUP_COL[sp.k]||XB_SUP_COL.toilet; c.fill();
+    c.lineWidth=1.4*u; c.strokeStyle='#FFFFFF'; c.stroke();
+  });
+  const lastI=pts.length-1;
+  c.textAlign='center'; c.textBaseline='middle';
+  c.font=`700 ${11*u}px "Fraunces","Noto Serif TC",serif`;
+  xbWpGroups(pts).forEach(G=>{
+    const kind = G.idx.includes(0) ? 'start' : G.idx.includes(lastI) ? 'end' : 'mid';
+    const label = G.idx.map(i=>i+1).join('·');
+    const [X,Y]=P(G.p.lat,G.p.lng);
+    const h=22*u, w=Math.max(h, c.measureText(label).width+14*u);
+    xbRoundRect(c, X-w/2, Y-h/2, w, h, h/2);
+    c.save(); c.shadowColor='rgba(0,0,0,.38)'; c.shadowBlur=3*u; c.shadowOffsetY=1*u;
+    c.fillStyle = kind==='start' ? '#3F7A4A' : kind==='end' ? '#2A2622' : '#BE3D24'; c.fill(); c.restore();
+    c.lineWidth=2*u; c.strokeStyle='#FBF8F0'; c.stroke();
+    c.fillStyle='#FBF8F0'; c.fillText(label, X, Y+.5*u);
+  });
+  c.font=`${10*u}px Arial,Helvetica,sans-serif`; c.textAlign='right'; c.textBaseline='middle';
+  const at='© OpenStreetMap contributors', aw=c.measureText(at).width;
+  c.fillStyle='rgba(255,255,255,.8)'; c.fillRect(W-aw-14*u, H-18*u, aw+14*u, 18*u);
+  c.fillStyle='#333333'; c.fillText(at, W-7*u, H-9*u);
+  if(!ok){
+    c.textAlign='left'; c.font=`${11*u}px "Noto Serif TC",serif`;
+    const t=tx('pdfNoTiles'), tw=c.measureText(t).width;
+    c.fillStyle='rgba(251,248,240,.92)'; c.fillRect(8*u, 8*u, tw+16*u, 22*u);
+    c.fillStyle='#857A66'; c.fillText(t, 16*u, 19*u);
+  }
+  c.strokeStyle='#DAD0BC'; c.lineWidth=2; c.strokeRect(1,1,W-2,H-2);
+  return {cv, ok, tot, zt};
+}
+async function xbPdfHeader(pxmm, wmm){
+  const W=Math.round(wmm*pxmm), H=Math.round(25*pxmm);
+  const cv=document.createElement('canvas'); cv.width=W; cv.height=H;
+  const c=cv.getContext('2d');
+  const serif='"Noto Serif TC","Fraunces",serif';
+  const now=new Date();
+  const stamp=`${dateISO(now)} ${fmt(now.getHours()*60+now.getMinutes())}`;
+  const L1='A BROMPTON ROADBOOK', L2=tx('pdfTitle'), L3=tx('pdfMeta')(dateISO(START_DATE), fmt(START), DWELL), L4=tx('pdfGen')(stamp, XB_VER);
+  try{ await Promise.all([document.fonts.load(`700 ${Math.round(7*pxmm)}px "Noto Serif TC"`, L2),
+                          document.fonts.load(`500 ${Math.round(3.5*pxmm)}px "Noto Serif TC"`, L3+L4)]); }catch(e){}
+  c.fillStyle=XB_PDF_BG; c.fillRect(0,0,W,H);
+  c.textBaseline='alphabetic'; c.textAlign='left';
+  const put=(t,y,size,weight,col)=>{
+    let z=size; c.font=`${weight} ${z}px ${serif}`;
+    while(c.measureText(t).width>W && z>8){ z-=1; c.font=`${weight} ${z}px ${serif}`; }
+    c.fillStyle=col; c.fillText(t,0,y);
+  };
+  put(L1, 4.2*pxmm, 2.8*pxmm, 600, '#B08A3E');
+  put(L2, 12.6*pxmm, 7*pxmm, 700, '#2A2622');
+  put(L3, 18.4*pxmm, 3.5*pxmm, 500, '#3A352E');
+  put(L4, 22.7*pxmm, 2.9*pxmm, 400, '#857A66');
+  c.fillStyle='#B08A3E'; c.fillRect(0, H-Math.max(2,0.35*pxmm), W, Math.max(2,0.35*pxmm));
+  return cv;
+}
+async function downloadPdf(){
+  if(XB_PDF_BUSY || ROUTE.length<2 || !SEGDATA.length) return;
+  const btn=document.getElementById('pdfBtn'), note=document.getElementById('pdfNote');
+  const say=t=>{ if(btn) btn.textContent=t; };
+  const tell=(t,err)=>{ if(!note) return; note.hidden=!t; note.textContent=t||''; note.classList.toggle('err',!!err); };
+  XB_PDF_BUSY=true; if(btn) btn.disabled=true; tell('');
+  const t0=Date.now();
+  try{
+    say(tx('pdfLoading'));
+    await xbPdfLibs();
+    if(document.fonts && document.fonts.ready) await document.fonts.ready;
+    const h2c=xbH2C(), jsPDF=window.jspdf.jsPDF;
+    const NSTEP=7; let step=0;
+    const tick=()=>say(tx('pdfWorking')(++step, NSTEP));
+    const pts = REVERSED ? [...ROUTE].reverse() : ROUTE;
+    const footTxt=tx('pdfFoot')(pts[0].n, pts[pts.length-1].n);
+    // A4 直式（mm）。每頁先在一張紙色 canvas（K＝8.5 px/mm，約 216 dpi）上排好，整頁轉成一張 JPEG 放進 PDF
+    const PW=210, PH=297, M=12, TOP=12, BOT=15, CW=PW-2*M, GAP=3.4, K=8.5;
+    const doc=new jsPDF({unit:'mm', format:'a4', orientation:'portrait', compress:true});
+    let pg=null, pc=null, y=TOP, np=0;
+    const begin=()=>{
+      pg=document.createElement('canvas'); pg.width=Math.round(PW*K); pg.height=Math.round(PH*K);
+      pc=pg.getContext('2d'); pc.fillStyle=XB_PDF_BG; pc.fillRect(0,0,pg.width,pg.height);
+      pc.imageSmoothingEnabled=true; pc.imageSmoothingQuality='high'; y=TOP;
+    };
+    const flush=()=>{
+      // 頁尾：細線＋路線名（頁碼最後以向量文字補上）
+      pc.fillStyle='#DAD0BC'; pc.fillRect(M*K, (PH-11.6)*K, CW*K, Math.max(1, .2*K));
+      pc.font=`400 ${2.7*K}px "Noto Serif TC","Fraunces",serif`; pc.fillStyle='#857A66';
+      pc.textAlign='left'; pc.textBaseline='alphabetic';
+      let ft=footTxt; const maxW=(CW-22)*K;
+      while(pc.measureText(ft).width>maxW && ft.length>4) ft=ft.slice(0,-2)+'…';
+      pc.fillText(ft, M*K, (PH-7)*K);
+      if(np>0) doc.addPage('a4','portrait');
+      doc.addImage(pg.toDataURL('image/jpeg', .9), 'JPEG', 0, 0, PW, PH);
+      np++; pg.width=0; pg.height=0; pg=null; pc=null;
+    };
+    const newPage=()=>{ flush(); begin(); };
+    const room=()=>PH-BOT-y;
+    const put=(cv, sy, sh, hmm)=>pc.drawImage(cv, 0, sy, cv.width, sh, M*K, y*K, CW*K, hmm*K);
+    // 放一張圖：放得下就接著放；放不下就換頁；比一頁還高（時間軸）就在 breaks（區塊交界，canvas px）處切開
+    const place=(cv, breaks)=>{
+      if(!cv || !cv.width || !cv.height) return;
+      const k=CW/cv.width, hmm=cv.height*k;
+      if(hmm<=room()){ put(cv, 0, cv.height, hmm); y+=hmm+GAP; return; }
+      if(hmm<=PH-TOP-BOT && !breaks){ newPage(); put(cv, 0, cv.height, hmm); y+=hmm+GAP; return; }
+      const B=(breaks||[]).map(v=>Math.round(v)).filter(v=>v>0 && v<cv.height).sort((p,q)=>p-q);
+      B.push(cv.height);
+      let s0=0, guard=0;
+      while(s0<cv.height && guard++<400){
+        const lim=s0+room()/k;
+        let e=-1;
+        for(const bk of B){ if(bk>s0 && bk<=lim) e=bk; }
+        if(e<0){
+          if(y>TOP+0.5){ newPage(); continue; }
+          e=Math.min(cv.height, Math.floor(lim));   // 單一區塊比整頁還高：只好硬切
+        }
+        put(cv, s0, e-s0, (e-s0)*k);
+        y+=(e-s0)*k; s0=e;
+        if(s0<cv.height) newPage(); else y+=GAP;
+      }
+    };
+    const shotOpt=extra=>Object.assign({scale:2, backgroundColor:XB_PDF_BG, useCORS:true, logging:false,
+      windowWidth:900, onclone:(d,el)=>xbPrepClone(d,el)}, extra||{});
+    const shot=async(el, extra)=>{
+      if(!el || el.hidden || !el.offsetHeight) return null;
+      try{ return await h2c(el, shotOpt(extra)); }
+      catch(e){ console.warn('[PDF] 擷取失敗：', el.id||el.className, e); return null; }
+    };
+    begin();
+    // 1 標頭
+    tick();
+    place(await xbPdfHeader(K, CW)); y+=1.5;
+    // 2 總評
+    tick();
+    const vCv=await shot(document.getElementById('verdict'));
+    if(!vCv) throw new Error('verdict');
+    place(vCv);
+    // 3 免責聲明＋地圖
+    tick();
+    place(await shot(document.getElementById('disclaim')));
+    const snap=await xbMapSnapshot();
+    place(snap.cv);
+    // 4 地圖圖例
+    tick();
+    place(await shot(document.getElementById('mapLegend')));
+    // 5 時間軸：一次擷取，在複本裡量出每個站點／路段的交界，作為換頁點
+    tick();
+    const tl=document.getElementById('timeline');
+    const tlScale=Math.max(1, Math.min(2, Math.sqrt(14e6/(800*Math.max(300, tl.offsetHeight)))));
+    let tlBreaks=null;
+    const tlCv=await h2c(tl, shotOpt({scale:tlScale, onclone:async(d,el)=>{
+      await xbPrepClone(d,el);
+      const t=(el && el.id==='timeline') ? el : d.getElementById('timeline'); if(!t) return;
+      const top=t.getBoundingClientRect().top, kids=[...t.children];
+      tlBreaks=kids.map((ch,i)=>{
+        const r=ch.getBoundingClientRect();
+        const prevBottom = i>0 ? kids[i-1].getBoundingClientRect().bottom : r.top;
+        return ((Math.max(prevBottom, r.top) + r.top)/2 - top)*tlScale;
+      });
+    }}));
+    if(!tlBreaks || !tlBreaks.length){
+      const ratio=tlCv.height/Math.max(1, tl.offsetHeight);
+      tlBreaks=[...tl.children].map(ch=>ch.offsetTop*ratio);
+    }
+    place(tlCv, tlBreaks);
+    tlCv.width=0; tlCv.height=0;
+    // 6 頁尾圖例（宜／留意／審慎、坡度分級）
+    tick();
+    for(const lg of document.querySelectorAll('.wrap > .legend')) place(await shot(lg));
+    // 7 收尾：最後一頁、頁碼
+    tick();
+    flush();
+    doc.setFont('helvetica','normal'); doc.setFontSize(8.5); doc.setTextColor(133,122,102);
+    for(let p=1;p<=np;p++){ doc.setPage(p); doc.text(`${p} / ${np}`, PW-M, PH-7, {align:'right'}); }
+    doc.setProperties({title:'Xiaobu Roadbook - ride analysis report', creator:'Xiaobu Roadbook '+XB_VER});
+    const clean=v=>String(v||'').replace(/[\\\/:*?"<>|\s]+/g,'').slice(0,18) || 'route';
+    const fname=`小布路書_${clean(pts[0].n)}-${clean(pts[pts.length-1].n)}_${dateISO(START_DATE)}.pdf`;
+    doc.save(fname);
+    console.log(`[PDF] ${fname} · ${np} 頁 · 底圖 ${snap.ok}/${snap.tot}（z${snap.zt}）· ${((Date.now()-t0)/1000).toFixed(1)} s`);
+    tell(tx('pdfDone'));
+    setTimeout(()=>{ if(note && note.textContent===tx('pdfDone')) tell(''); }, 6000);
+  }catch(e){
+    console.warn('[PDF] 製作失敗：', e);
+    tell(tx('pdfFail')(String(e&&e.message||e).slice(0,80)), true);
+  }finally{
+    XB_PDF_BUSY=false;
+    if(btn){ btn.disabled=false; btn.textContent=tx('pdfBtn'); }
+  }
 }
 
 // ---------- GPX & Google Maps handoff ----------
@@ -2693,8 +3033,9 @@ document.getElementById('gpxFile').addEventListener('change', async e=>{
   }catch(err){ note.textContent=tx('gpxBad'); }
 });
 document.getElementById('gpxBtn').addEventListener('click', downloadGpx);
+document.getElementById('pdfBtn').addEventListener('click', downloadPdf);
 loadTdxStations();
-console.log("小布路書 v2.7 (2026-10-18) · 路網四道防線＋地圖圖例 · GPX/KML 匯入分析 · 桃園海岸騎點庫 · zh/en/ja · 離線快照＋沿線補給 · Komoot 834趟有效速度校準");
+console.log("小布路書 v2.7.1 (2026-10-18) · 補給點全部標示＋PDF 報告 · 路網四道防線＋地圖圖例 · GPX/KML 匯入分析 · 桃園海岸騎點庫 · zh/en/ja · 離線快照＋沿線補給 · Komoot 834趟有效速度校準");
 document.querySelectorAll('.lang-sw button').forEach(b=>b.addEventListener('click',()=>setLang(b.dataset.lang)));
 applyStatic();
 renderWaypoints();

@@ -1705,6 +1705,29 @@ async function xbSupplyNodes(P){
   const chain=P.map(p=>p[0]+','+p[1]).join(',');
   const ql=`[out:json][timeout:25];nwr[~"^(shop|amenity)$"~"^(convenience|toilets|drinking_water)$"](around:400,${chain});out center 350;`;
   const eps=['https://overpass-api.de/api/interpreter','https://overpass.kumi.systems/api/interpreter','https://overpass.osm.jp/api/interpreter'];
+
+  // 先走棲共生站的共用代查（overpass.ch 專屬金鑰額度＋跨站共用快取），
+  // 失敗才啟動下面原本的鏡像競速。2026-10-27 實測公用伺服器壅塞時，
+  // overpass-api.de 要 25 秒（超過這裡 15 秒的上限）、另兩台完全不回應，
+  // 也就是三台全滅、只能掉到 /api/supply 後援。
+  //
+  // 刻意不把代查加進競速：競速會同時打每一台，即使公用伺服器先回，
+  // overpass.ch 的額度也已經被消耗。代查正常只要 0.5 秒，先問它更快也更省。
+  const proxied=await (async()=>{
+    const ctl=new AbortController(); const to=setTimeout(()=>ctl.abort(),12000);
+    try{
+      const r=await fetch('https://eco4design.healsdesign.org/api/osm',{method:'POST',
+        headers:{'content-type':'application/x-www-form-urlencoded'},
+        body:'data='+encodeURIComponent(ql),signal:ctl.signal});
+      if(!r.ok) throw new Error('HTTP '+r.status);
+      const j=await r.json();
+      if(j&&j.remark) console.warn('[補給] overpass remark:',j.remark);
+      return j;
+    }catch(e){ console.warn('[補給] 共用代查失敗，改用鏡像競速:',String(e&&e.message||e)); return null; }
+    finally{ clearTimeout(to); }
+  })();
+  if(proxied) return xbParseOverpass(proxied);
+
   const direct=await new Promise(res=>{
     let left=eps.length, done=false;
     const fin=v=>{ if(done) return; if(v){ done=true; res(v); return; } if(--left<=0){ done=true; res(null); } };

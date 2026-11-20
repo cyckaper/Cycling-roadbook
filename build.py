@@ -327,7 +327,7 @@ TEMPLATE = r'''<!DOCTYPE html>
   .chip{font-family:"Noto Serif TC",serif; font-size:13.5px; color:var(--body); cursor:pointer;
     border:1px solid var(--line); background:var(--paper); border-radius:999px; padding:6px 14px}
   .chip:hover{border-color:var(--gold); color:var(--ink)}
-  .wp-list{display:flex; flex-wrap:wrap; gap:8px; margin:0 0 12px}
+  .wp-list{display:flex; flex-wrap:wrap; gap:8px; margin:0 0 12px; position:relative}
   .wp-list:empty{display:none}
   .wp-chip{display:inline-flex; align-items:center; gap:8px; font-size:14.5px; color:var(--ink);
     background:color-mix(in srgb,var(--gold) 13%, var(--card)); border:1px solid color-mix(in srgb,var(--gold) 42%, transparent);
@@ -336,6 +336,23 @@ TEMPLATE = r'''<!DOCTYPE html>
   .wp-chip button{border:0; background:color-mix(in srgb,var(--ink) 8%, transparent); color:var(--body); cursor:pointer;
     width:20px; height:20px; border-radius:50%; font-size:11px; line-height:1; display:grid; place-items:center}
   .wp-chip button:hover{background:var(--risk); color:#FBF8F0}
+  /* v2.6.4 地點順序：拖曳（手機長按再拖）、Alt＋方向鍵；新插入／移動的地點閃一下 */
+  .wp-chip{cursor:grab; -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; touch-action:manipulation}
+  .wp-chip:focus-visible{outline:2px solid var(--gold); outline-offset:2px}
+  .wp-chip.dragging{opacity:.32}
+  .wp-chip.wp-new{animation:wpFlash 2.2s ease-out}
+  @keyframes wpFlash{0%,40%{box-shadow:0 0 0 3px color-mix(in srgb,var(--gold) 75%, transparent); background:color-mix(in srgb,var(--gold) 30%, var(--card))}
+    100%{box-shadow:0 0 0 0 transparent}}
+  .wp-ghost{position:fixed; left:0; top:0; z-index:1000; margin:0; pointer-events:none; opacity:.96; cursor:grabbing;
+    transform:translate(-50%,-50%) scale(1.06) rotate(-1.5deg); box-shadow:0 12px 26px rgba(42,38,34,.28)}
+  .wp-caret{position:absolute; width:3px; border-radius:2px; background:var(--gold); pointer-events:none;
+    box-shadow:0 0 0 3px color-mix(in srgb,var(--gold) 22%, transparent)}
+  body.wp-dragging, body.wp-dragging *{cursor:grabbing!important; -webkit-user-select:none; user-select:none}
+  .wp-note{font-size:13px; line-height:1.7; color:var(--body); margin:-4px 0 12px;
+    background:color-mix(in srgb,var(--gold) 9%, transparent); border-left:3px solid var(--gold); padding:6px 10px; border-radius:0 6px 6px 0}
+  .wp-note__btn{font:inherit; font-size:12.5px; color:var(--ink); background:var(--card); border:1px solid var(--line);
+    border-radius:999px; padding:1px 10px; margin-left:6px; cursor:pointer}
+  .wp-note__btn:hover{border-color:var(--gold)}
   .combo{position:relative}
   #wpInput{width:100%; font-family:"Noto Serif TC",serif; font-size:16px; color:var(--ink);
     border:1px solid var(--line); background:var(--paper); border-radius:8px; padding:12px 16px}
@@ -600,6 +617,7 @@ TEMPLATE = r'''<!DOCTYPE html>
       <textarea id="tripText" rows="3" data-i18n-ph="phTrip" placeholder="貼上路線敘述、遊記或地點清單，例如：花蓮車站出發，經七星潭、新城老街、佳興小吃店，進太魯閣到天祥…"></textarea>
       <div class="sub-div"><span data-i18n="orPick">或逐一挑選</span></div>
       <div class="wp-list" id="wpList"></div>
+      <p class="wp-note" id="wpNote" hidden></p>
       <div class="combo">
         <input id="wpInput" type="text" autocomplete="off" data-i18n-ph="phWp" placeholder="輸入地名，如 花蓮車站、淡水、太魯閣… 再從清單點選">
         <div class="suggest" id="suggest" hidden></div>
@@ -1117,7 +1135,15 @@ zh:{
  orPick:"或逐一挑選",
  phWp:"輸入地名，如 花蓮車站、淡水、太魯閣… 再從清單點選",
  clearBtn:"清空路線",
- hint:"每個地點都從清單挑選、帶有確定座標，所以不會認錯地名或定位到錯的地方。",
+ hint:"每個地點都從清單挑選、帶有確定座標，所以不會認錯地名或定位到錯的地方。新加入的地點會自動插在最順路的位置；順序可直接拖曳地點調整（手機請長按地點再拖）。",
+ wpIns:(n,k,a,b)=>`「${n}」已插在第 ${k} 點：${a} 與 ${b} 之間，這裡繞路最少。`,
+ wpInsFirst:n=>`「${n}」已放在最前面，成為新的起點。`,
+ wpInsLast:n=>`「${n}」已加在最後。`,
+ wpRevisit:n=>`「${n}」已在路線中，視為回到此地，加在最後。`,
+ wpDup:n=>`「${n}」已經是最後一點，沒有重複加入。`,
+ wpToEnd:"改放最後", wpMoved:(n,k)=>`已把「${n}」移到第 ${k} 點。`,
+ wpGpxOff:"順序改變後，路線改以路網重新規劃，不再沿用原本的 GPX 軌跡。",
+ wpDragTip:"拖曳可調整順序（手機請長按再拖）；鍵盤可用 Alt＋←／→", wpRemove:"移除",
  ctlDate:"出發日期", ctlTime:"時間", ctlDwell:"每點停留", unitMin:"分",
  revOff:"反轉方向 ⇄", revOn:"已反轉方向 ⇄",
  noteLive:"路徑／坡度／撤退依真實路網計算；天氣接 CWA 鄉鎮逐3小時預報（未設金鑰或超出預報範圍時退 Open-Meteo／示範情境，來源如實標示）",
@@ -1138,7 +1164,7 @@ zh:{
  bl_downS:'<i style="background:#4A6076"></i>陡降 低於−8%',
  mSummary:"這些時刻怎麼算？——834 趟實騎的校準方法",
  mBody:"<p>本站的抵達時刻不是理論值，而是從車主 2018–2026 年間以 Brompton 實際完成、記錄於 Komoot 的 939 趟騎乘中校準出來的。剔除非單車活動、短於 3 公里或缺時間戳的紀錄後，留下 <b>834 趟、約 31,790 公里、六百二十萬個軌跡點</b>。</p><p>每條軌跡先做高程清理：沿線以 ±100 公尺視窗中位數濾波去除尖刺，再每 30 公尺重取樣、±60 公尺移動平均平滑；坡度取 ±50 公尺視窗的高差比，據此把每一小段歸入七個坡度帶——陡降（≤−8%）、下坡、平路（−2〜2%）、緩坡、陡坡、很陡、極陡（&gt;12%）。</p><p>速度統計剔除近乎靜止（&lt;1.5 km/h）、GPS 突跳（&gt;80 km/h）與錄製斷點（相鄰點時距 ≥10 秒的橋接段）後，各帶採<b>有效速度＝Σ距離 ÷ Σ移動時間</b>——而非平均巡航速度：慢的路段按時間放大權重，算出來的才是「抵達時刻」真正需要的數字。樣本以近 24 個月為主，不足的帶回退全庫。</p><p>交叉驗證：全庫算得的平路有效速度 16.3 km/h，與另一趟獨立實騎量得、並通過沿線抵達時刻三分鐘誤差檢驗的 16.2 幾乎重合；各爬坡帶亦互相印證。唯一例外是極陡帶，樣本僅 29 公里且受高程雜訊污染，故採保守值。各帶數值見頁尾；每點停留時間由上方欄位另行輸入，不混入配速。</p>",
- colophon:'<b>小布路書</b> · Brompton Roadbook（原「單車騎行農民曆」）· 版本 <b>v2.7.1</b>（2026-10-18）<br>© 2026 Chang Chun-Yen · HEALS Design · 版權所有，未經授權請勿轉載<br>路線、坡度、天氣皆為推估，僅供參考；騎乘安全請自行評估。<br>路線距離＝直線距離 × 1.3 迂迴係數；爬升＝海拔差 + 每公里起伏估算；ETA 依坡度分段配速（平路16.3・緩坡12・陡坡8.2・很陡6.6・極陡4.5・下坡21.2・陡降19.7 km/h，2024–2026 Komoot 834 趟完騎有效速度校準）與每點停留推算；頂／順風由每段方位角與當時風向相減。<br>地名座標來自 Open-Meteo Geocoding 與 OpenStreetMap Nominatim、海拔來自 Open-Meteo；天氣為示範情境，實際以出發當日之逐時預報與現場風雨為準。',
+ colophon:'<b>小布路書</b> · Brompton Roadbook（原「單車騎行農民曆」）· 版本 <b>v2.7.2</b>（2026-11-20）<br>© 2026 Chang Chun-Yen · HEALS Design · 版權所有，未經授權請勿轉載<br>路線、坡度、天氣皆為推估，僅供參考；騎乘安全請自行評估。<br>路線距離＝直線距離 × 1.3 迂迴係數；爬升＝海拔差 + 每公里起伏估算；ETA 依坡度分段配速（平路16.3・緩坡12・陡坡8.2・很陡6.6・極陡4.5・下坡21.2・陡降19.7 km/h，2024–2026 Komoot 834 趟完騎有效速度校準）與每點停留推算；頂／順風由每段方位角與當時風向相減。<br>地名座標來自 Open-Meteo Geocoding 與 OpenStreetMap Nominatim、海拔來自 Open-Meteo；天氣為示範情境，實際以出發當日之逐時預報與現場風雨為準。',
  todayTerm:"今日節氣", yiChar:"宜", jiChar:"忌",
  emptyRoute:"打字搜尋地點、從清單挑選加入（或點熱門騎點）；湊滿兩點、設好出發時間與停留，按「開始分析」讀今天這條路線的天時。",
  statusGood:"今日宜騎", statusWarn:"可騎 · 留意時段", statusRisk:"審慎 · 有挑戰路段",
@@ -1229,7 +1255,15 @@ en:{
  orPick:"or pick one by one",
  phWp:"Type a place name, e.g. 淡水, 太魯閣, Hualien Station… then pick from the list",
  clearBtn:"Clear route",
- hint:"Every waypoint is picked from a list with verified coordinates, so names are never misread or mislocated.",
+ hint:"Every waypoint is picked from a list with verified coordinates, so names are never misread or mislocated. A newly added place is slotted in where it adds the least detour; drag the places to reorder them (on a phone, long-press a place, then drag).",
+ wpIns:(n,k,a,b)=>`“${n}” was inserted as stop ${k}, between ${a} and ${b} — the smallest detour.`,
+ wpInsFirst:n=>`“${n}” was placed first and is now the start.`,
+ wpInsLast:n=>`“${n}” was added at the end.`,
+ wpRevisit:n=>`“${n}” is already on the route, so it was added at the end as a return visit.`,
+ wpDup:n=>`“${n}” is already the last stop, so it was not added again.`,
+ wpToEnd:"Move to end", wpMoved:(n,k)=>`Moved “${n}” to stop ${k}.`,
+ wpGpxOff:" With the new order the route is re-planned on the road network; the original GPX track is no longer used.",
+ wpDragTip:"Drag to reorder (on a phone, long-press first); keyboard: Alt + ← / →", wpRemove:"Remove",
  ctlDate:"Date", ctlTime:"Start", ctlDwell:"Stop per point", unitMin:"min",
  revOff:"Reverse direction ⇄", revOn:"Direction reversed ⇄",
  noteLive:"Routes, grades and bail-outs use the real road network; weather uses CWA township 3-hourly forecasts (falls back to Open-Meteo / demo when no key or out of range — source always shown).",
@@ -1250,7 +1284,7 @@ en:{
  bl_downS:'<i style="background:#4A6076"></i>Steep down <−8%',
  mSummary:"How are these times computed? — calibrated on 834 real rides",
  mBody:"<p>Arrival times here are not theoretical. They are calibrated from 939 rides the owner actually completed on a Brompton between 2018–2026, recorded on Komoot. After removing non-cycling activities, rides under 3 km, and files without timestamps, <b>834 rides remain — about 31,790 km and 6.2 million track points</b>.</p><p>Each track first gets elevation cleaning: a ±100 m median filter along the line removes spikes, then 30 m resampling and a ±60 m moving average smooth the profile; grade is taken over a ±50 m window, and every short segment is assigned to one of seven bands — steep descent (≤−8%), downhill, flat (−2〜2%), gentle, steep, very steep, extreme (&gt;12%).</p><p>After excluding near-standstill samples (&lt;1.5 km/h), GPS spikes (&gt;80 km/h) and recording gaps (bridged segments with ≥10 s between points), each band uses <b>effective speed = Σdistance ÷ Σmoving time</b> — not average cruising speed: slow stretches are weighted by time, which is exactly what an arrival time needs. Samples favour the last 24 months, falling back to the full library where thin.</p><p>Cross-check: the library-wide flat effective speed of 16.3 km/h almost exactly matches 16.2 measured independently on a single ride that passed a 3-minute arrival-time test; climbing bands corroborate each other likewise. The one exception is the extreme band — only 29 km of noisy samples — so a conservative value is used. Band values are in the footer; stop time per waypoint is entered above and never mixed into pace.</p>",
- colophon:'<b>小布路書</b> · Xiaobu Roadbook — a Brompton Roadbook (formerly “A Cyclist’s Almanac”) · Version <b>v2.7.1</b> (2026-10-18)<br>© 2026 Chang Chun-Yen · HEALS Design · All rights reserved<br>Routes, grades and weather are estimates for reference only; assess riding safety yourself.<br>Fallback route length = straight-line × 1.3; climb = elevation gap + per-km undulation. ETA uses graded pace (flat 16.3 · gentle 12 · steep 8.2 · v-steep 6.6 · extreme 4.5 · down 21.2 · steep-down 19.7 km/h, effective speeds calibrated on 834 Komoot rides 2024–2026) plus stop time per waypoint; head/tailwind from segment bearing vs. hourly wind.<br>Geocoding by Open-Meteo Geocoding & OpenStreetMap Nominatim; elevation by Open-Meteo. Demo weather is illustrative — trust the day’s forecast and conditions on the road.',
+ colophon:'<b>小布路書</b> · Xiaobu Roadbook — a Brompton Roadbook (formerly “A Cyclist’s Almanac”) · Version <b>v2.7.2</b> (2026-11-20)<br>© 2026 Chang Chun-Yen · HEALS Design · All rights reserved<br>Routes, grades and weather are estimates for reference only; assess riding safety yourself.<br>Fallback route length = straight-line × 1.3; climb = elevation gap + per-km undulation. ETA uses graded pace (flat 16.3 · gentle 12 · steep 8.2 · v-steep 6.6 · extreme 4.5 · down 21.2 · steep-down 19.7 km/h, effective speeds calibrated on 834 Komoot rides 2024–2026) plus stop time per waypoint; head/tailwind from segment bearing vs. hourly wind.<br>Geocoding by Open-Meteo Geocoding & OpenStreetMap Nominatim; elevation by Open-Meteo. Demo weather is illustrative — trust the day’s forecast and conditions on the road.',
  todayTerm:"Today's solar term", yiChar:"Do", jiChar:"Skip",
  emptyRoute:"Type to search and pick places (or tap a popular spot); with two or more set, choose your start time and stops, then press Analyze.",
  statusGood:"A good day to ride", statusWarn:"Rideable · mind the timing", statusRisk:"Ride with care · challenging section",
@@ -1341,7 +1375,15 @@ ja:{
  orPick:"または一つずつ選ぶ",
  phWp:"地名を入力（例：淡水、太魯閣、花蓮車站…）候補から選択",
  clearBtn:"ルートを消去",
- hint:"経由地はすべて候補リストから選ばれ、確定座標付き。地名の誤認・誤位置は起きません。",
+ hint:"経由地はすべて候補リストから選ばれ、確定座標付き。地名の誤認・誤位置は起きません。新しく加えた地点は遠回りが最も少ない位置に自動で入り、順番は地点をドラッグして変えられます（スマホは長押ししてからドラッグ）。",
+ wpIns:(n,k,a,b)=>`「${n}」を ${k} 番目（${a} と ${b} の間）に入れました。遠回りが最も少ない位置です。`,
+ wpInsFirst:n=>`「${n}」を先頭に入れ、新しい出発地にしました。`,
+ wpInsLast:n=>`「${n}」を最後に追加しました。`,
+ wpRevisit:n=>`「${n}」はすでにルート上にあるため、再訪として最後に追加しました。`,
+ wpDup:n=>`「${n}」はすでに最後の地点なので、重ねて追加しませんでした。`,
+ wpToEnd:"最後に移動", wpMoved:(n,k)=>`「${n}」を ${k} 番目に移動しました。`,
+ wpGpxOff:"順番を変えたため、ルートは道路網で引き直します（元の GPX 軌跡は使いません）。",
+ wpDragTip:"ドラッグで順番を変更（スマホは長押ししてから）。キーボードは Alt＋←／→", wpRemove:"削除",
  ctlDate:"出発日", ctlTime:"時刻", ctlDwell:"各地点の滞在", unitMin:"分",
  revOff:"方向を反転 ⇄", revOn:"反転済み ⇄",
  noteLive:"ルート／勾配／退避は実路網で計算。天気は CWA 郷鎮3時間予報（キー未設定・範囲外は Open-Meteo／デモにフォールバック。出典は常に表示）",
@@ -1362,7 +1404,7 @@ ja:{
  bl_downS:'<i style="background:#4A6076"></i>急降 −8%未満',
  mSummary:"この到着時刻はどう計算？——実走834本による校正",
  mBody:"<p>本サイトの到着時刻は理論値ではありません。オーナーが 2018–2026 年に Brompton で実際に完走し Komoot に記録した 939 本の走行から校正されています。自転車以外・3 km 未満・タイムスタンプ欠落を除き、<b>834 本・約 31,790 km・620 万トラックポイント</b>が残りました。</p><p>各トラックはまず標高クリーニング：沿線 ±100 m の中央値フィルタでスパイクを除去し、30 m ごとに再サンプル、±60 m 移動平均で平滑化。勾配は ±50 m 窓で取り、各区間を七つの帯——急降（≤−8%）・下り・平坦（−2〜2%）・緩坂・急坂・激坂・極坂（&gt;12%）——に振り分けます。</p><p>ほぼ静止（&lt;1.5 km/h）、GPS スパイク（&gt;80 km/h）、記録ギャップ（隣接点間 ≥10 秒のブリッジ区間）を除外した上で、各帯は<b>有効速度＝Σ距離 ÷ Σ移動時間</b>を採用——平均巡航速度ではありません。遅い区間ほど時間で重みが増し、それこそが「到着時刻」に必要な数字です。標本は直近 24 か月を主とし、不足帯は全期間で補完。</p><p>相互検証：全データの平坦有効速度 16.3 km/h は、独立した一本の実走で測られ沿線到着 3 分誤差の検証を通った 16.2 とほぼ一致。登坂帯も互いに整合します。唯一の例外は極坂帯（標本 29 km・ノイズ混入）で、保守値を採用。各帯の値はフッター参照。各地点の滞在時間は上の欄で別入力され、ペースには混ぜません。</p>",
- colophon:'<b>小布路書</b> · ブロンプトン・ロードブック（旧「単車騎行農民暦」）· バージョン <b>v2.7.1</b>（2026-10-18）<br>© 2026 Chang Chun-Yen · HEALS Design · 無断転載を禁じます<br>ルート・勾配・天気は推定であり参考情報です。走行の安全はご自身で判断してください。<br>簡易時：距離＝直線 × 1.3、獲得標高＝標高差＋km あたり起伏。ETA は勾配別ペース（平坦16.3・緩坂12・急坂8.2・激坂6.6・極坂4.5・下り21.2・急降19.7 km/h、2024–2026 Komoot 実走834本の有効速度で校正）と各地点滞在から算出。向かい風／追い風は区間方位と毎時風向の差。<br>地名は Open-Meteo Geocoding と OpenStreetMap Nominatim、標高は Open-Meteo。デモ天気は例示であり、当日の予報と現地の風雨を優先してください。',
+ colophon:'<b>小布路書</b> · ブロンプトン・ロードブック（旧「単車騎行農民暦」）· バージョン <b>v2.7.2</b>（2026-11-20）<br>© 2026 Chang Chun-Yen · HEALS Design · 無断転載を禁じます<br>ルート・勾配・天気は推定であり参考情報です。走行の安全はご自身で判断してください。<br>簡易時：距離＝直線 × 1.3、獲得標高＝標高差＋km あたり起伏。ETA は勾配別ペース（平坦16.3・緩坂12・急坂8.2・激坂6.6・極坂4.5・下り21.2・急降19.7 km/h、2024–2026 Komoot 実走834本の有効速度で校正）と各地点滞在から算出。向かい風／追い風は区間方位と毎時風向の差。<br>地名は Open-Meteo Geocoding と OpenStreetMap Nominatim、標高は Open-Meteo。デモ天気は例示であり、当日の予報と現地の風雨を優先してください。',
  todayTerm:"今日の節気", yiChar:"宜", jiChar:"忌",
  emptyRoute:"地名を入力して候補から追加（人気スポットのタップでも可）。2 地点以上そろえ、出発時刻と滞在を設定したら「分析開始」で天時を読みます。",
  statusGood:"本日、走るに宜し", statusWarn:"走行可 · 時間帯に注意", statusRisk:"慎重に · 難所あり",
@@ -2580,7 +2622,7 @@ function renderMapLegend(st){
 // ---------- PDF 報告（v2.7.1）：整份分析存成 A4 PDF ----------
 // 文字區塊以 html2canvas-pro 擷取（支援 color-mix 等新式色彩），地圖另以 canvas 依 Web Mercator 重繪（底圖＋路線＋補給＋路點），
 // jsPDF 排版：A4 直式、紙色底、區塊不跨頁，時間軸在站點／路段交界處換頁。兩個函式庫只在按下按鈕時才載入。
-var XB_VER='v2.7.1', XB_PDF_BUSY=false, XB_PDF_BG='#F3EEE2';
+var XB_VER='v2.7.2', XB_PDF_BUSY=false, XB_PDF_BG='#F3EEE2';
 function xbLoadScript(src){
   return new Promise((res,rej)=>{
     const sc=document.createElement('script'); sc.src=src; sc.async=true;
@@ -2895,28 +2937,185 @@ function wpFromStation(s){ return {n:s[0]+"站",lat:s[1],lng:s[2],elev:null,wz:"
 function wpFromGeo(x){ const w={n:x.n,lat:x.lat,lng:x.lng,elev:(x.elev??null),wz:"basin",
   esc:{st:tx('escPending'),km:0,hard:false},src:"geo"}; if(w.elev!==null) w.wz=inferZone(w); return w; }
 
+// ----- 加入地點：插在最順路的位置（v2.6.4） -----
+// 以直線距離估「插入後總里程增加多少」，取增加最少的位置。起終點多半是車站等固定點，
+// 插在最前或最後的成本加權 1.5 倍；環線（起終點相同）只插在中間。
+// 與既有地點重合（150 m 內或同名）視為回到此地：加在最後（環線則加在回到起點之前）；與最後一點重合則不重複加入。
+var XB_END_W=1.5;
+function xbSameSpot(a,b){ return normName(a.n)===normName(b.n) || haversine(a,b)<0.15; }
+function xbInsertAt(w){
+  const W=WAYPOINTS, n=W.length;
+  if(n<2) return n;
+  const loop = xbSameSpot(W[0], W[n-1]);
+  if(W.some(p=>xbSameSpot(p,w))) return loop ? n-1 : n;
+  let best=n, bestCost=Infinity;
+  for(let k=(loop?1:0); k<=(loop?n-1:n); k++){
+    const c = k===0 ? XB_END_W*haversine(w,W[0])
+            : k===n ? XB_END_W*haversine(W[n-1],w)
+            : haversine(W[k-1],w)+haversine(w,W[k])-haversine(W[k-1],W[k]);
+    if(c<bestCost-1e-9){ bestCost=c; best=k; }
+  }
+  return best;
+}
 function addWaypoint(w){
-  WAYPOINTS.push(w);
+  wpInput.value=""; hideSuggest();
+  const n=WAYPOINTS.length;
+  if(n && xbSameSpot(WAYPOINTS[n-1], w)){ xbWpNote(tx('wpDup')(w.n)); wpInput.focus(); return; }
+  const revisit = WAYPOINTS.some(p=>xbSameSpot(p,w));
+  const k=xbInsertAt(w);
+  WAYPOINTS.splice(k,0,w);
   GPXDATA=null;
-    const lastWp=WAYPOINTS[WAYPOINTS.length-2];
-    if(lastWp && WAYPOINTS.length>=2 && (normName(lastWp.n)===normName(WAYPOINTS[WAYPOINTS.length-1].n) || haversine(lastWp,WAYPOINTS[WAYPOINTS.length-1])<0.15)) WAYPOINTS.pop();
-    wpInput.value=""; hideSuggest(); renderWaypoints(); NEED_RUN=true; paintGo();
+  renderWaypoints(n>=2?k:-1); NEED_RUN=true; paintGo();
+  const N=WAYPOINTS.length;
+  if(n<2) xbWpNote('');
+  else if(k===N-1) xbWpNote(revisit ? tx('wpRevisit')(w.n) : tx('wpInsLast')(w.n));
+  else if(k===0) xbWpNote(tx('wpInsFirst')(w.n), w);
+  else xbWpNote(tx('wpIns')(w.n, k+1, WAYPOINTS[k-1].n, WAYPOINTS[k+1].n), w);
   wpInput.focus();
 }
-function removeWaypoint(i){ WAYPOINTS.splice(i,1); renderWaypoints(); NEED_RUN=true; paintGo(); }
+function removeWaypoint(i){ WAYPOINTS.splice(i,1); renderWaypoints(); NEED_RUN=true; paintGo(); xbWpNote(''); }
+function xbMoveWaypoint(from,to,focus){
+  const n=WAYPOINTS.length;
+  if(from===to || from<0 || from>=n || to<0 || to>=n) return;
+  const wasGpx=!!GPXDATA;
+  const [w]=WAYPOINTS.splice(from,1); WAYPOINTS.splice(to,0,w);
+  GPXDATA=null;
+  renderWaypoints(to); NEED_RUN=true; paintGo();
+  xbWpNote(tx('wpMoved')(w.n,to+1)+(wasGpx?tx('wpGpxOff'):''));
+  if(focus){ const el=wpListEl.querySelectorAll('.wp-chip')[to]; if(el) el.focus(); }
+}
+var XB_NOTE_T=0;
+function xbWpNote(msg, toEndWp){
+  const el=document.getElementById('wpNote'); if(!el) return;
+  clearTimeout(XB_NOTE_T);
+  el.textContent='';
+  if(!msg){ el.hidden=true; return; }
+  el.appendChild(document.createTextNode(msg));
+  if(toEndWp){
+    const b=document.createElement('button'); b.type='button'; b.className='wp-note__btn'; b.textContent=tx('wpToEnd');
+    b.addEventListener('click',()=>{ const i=WAYPOINTS.indexOf(toEndWp); if(i>=0 && i<WAYPOINTS.length-1) xbMoveWaypoint(i, WAYPOINTS.length-1); });
+    el.appendChild(b);
+  }
+  el.hidden=false;
+  XB_NOTE_T=setTimeout(()=>{ el.hidden=true; }, 25000);
+}
 
-function renderWaypoints(){
+function renderWaypoints(flash){
+  xbDragCleanup();
   wpListEl.innerHTML="";
   WAYPOINTS.forEach((w,i)=>{
-    const c=document.createElement('span'); c.className="wp-chip";
-    c.innerHTML=`<span class="idx">${i+1}</span>${w.n}<button aria-label="移除">✕</button>`;
-    c.querySelector('button').addEventListener('click',e=>{ e.stopPropagation(); removeWaypoint(i); });
-    c.style.cursor='pointer';
-    c.addEventListener('click',()=>{ if(MAP&&isFinite(w.lat)){ MAP.setView([w.lat,w.lng],14);
-      L.popup({closeButton:false,autoClose:true}).setLatLng([w.lat,w.lng]).setContent(`${i+1} · ${w.n}`).openOn(MAP); } });
+    const c=document.createElement('span'); c.className="wp-chip"+(i===flash?" wp-new":"");
+    c.dataset.i=i; c.tabIndex=0; c.title=tx('wpDragTip');
+    const ix=document.createElement('span'); ix.className='idx'; ix.textContent=String(i+1);
+    const nm=document.createElement('span'); nm.className='nm'; nm.textContent=w.n;
+    const x=document.createElement('button'); x.type='button'; x.setAttribute('aria-label', tx('wpRemove')); x.textContent='✕';
+    c.append(ix, nm, x);
+    x.addEventListener('click',e=>{ e.stopPropagation(); removeWaypoint(i); });
+    c.addEventListener('click',()=>{ if(Date.now()-XB_DRAG_AT<450) return;
+      if(MAP&&isFinite(w.lat)){ MAP.setView([w.lat,w.lng],14);
+      L.popup({closeButton:false,autoClose:true}).setLatLng([w.lat,w.lng]).setContent(`${i+1} · ${xml(w.n)}`).openOn(MAP); } });
+    c.addEventListener('pointerdown', xbChipDown);
+    c.addEventListener('touchmove', e=>{ if(XB_DRAG && XB_DRAG.active) e.preventDefault(); }, {passive:false});
+    c.addEventListener('contextmenu', e=>{ if(XB_DRAG) e.preventDefault(); });
+    c.addEventListener('keydown', e=>xbChipKey(e,i));
     wpListEl.appendChild(c);
   });
   try{ paintSnapBar(); }catch(e){}
+}
+
+// ----- 地點順序：滑鼠拖曳、手機長按 0.26 秒後拖曳、Alt＋方向鍵 -----
+var XB_DRAG=null, XB_DRAG_AT=0;
+function xbChipKey(e,i){
+  const k=e.key;
+  if(e.altKey && (k==='ArrowLeft'||k==='ArrowUp')){ e.preventDefault(); if(i>0) xbMoveWaypoint(i,i-1,true); }
+  else if(e.altKey && (k==='ArrowRight'||k==='ArrowDown')){ e.preventDefault(); if(i<WAYPOINTS.length-1) xbMoveWaypoint(i,i+1,true); }
+  else if(k==='Enter'||k===' '){ e.preventDefault(); e.currentTarget.click(); }
+  else if(k==='Delete'){ e.preventDefault(); removeWaypoint(i); }
+}
+function xbChipDown(e){
+  if(e.target.closest('button')) return;
+  if(e.pointerType==='mouse' && e.button!==0) return;
+  if(WAYPOINTS.length<2) return;
+  xbDragCleanup();
+  const chip=e.currentTarget;
+  const st={i:+chip.dataset.i, chip, id:e.pointerId, x0:e.clientX, y0:e.clientY, x:e.clientX, y:e.clientY,
+            touch:e.pointerType!=='mouse', active:false, timer:0, drop:null, ghost:null, caret:null};
+  XB_DRAG=st;
+  if(st.touch) st.timer=setTimeout(()=>{ if(XB_DRAG===st) xbDragBegin(st); }, 260);
+  window.addEventListener('pointermove', xbDragMove, {passive:false});
+  window.addEventListener('pointerup', xbDragEnd);
+  window.addEventListener('pointercancel', xbDragCancel);
+}
+function xbDragMove(e){
+  const st=XB_DRAG; if(!st || e.pointerId!==st.id) return;
+  st.x=e.clientX; st.y=e.clientY;
+  if(!st.active){
+    const dist=Math.hypot(st.x-st.x0, st.y-st.y0);
+    if(st.touch){ if(dist>10) xbDragCleanup(); return; }   // 還沒長按就移動＝在捲動頁面
+    if(dist<5) return;
+    xbDragBegin(st);
+  }
+  e.preventDefault();
+  xbDragPaint(st);
+}
+function xbDragBegin(st){
+  if(st.active || !st.chip.isConnected) return;
+  st.active=true;
+  const r=st.chip.getBoundingClientRect();
+  const g=st.chip.cloneNode(true); g.classList.remove('wp-new'); g.classList.add('wp-ghost');
+  g.removeAttribute('tabindex'); g.setAttribute('aria-hidden','true'); g.style.width=r.width+'px';
+  document.body.appendChild(g); st.ghost=g;
+  const c=document.createElement('div'); c.className='wp-caret'; c.hidden=true; wpListEl.appendChild(c); st.caret=c;
+  st.chip.classList.add('dragging'); document.body.classList.add('wp-dragging');
+  try{ if(st.touch && navigator.vibrate) navigator.vibrate(12); }catch(e){}
+  xbDragPaint(st);
+}
+function xbDropAt(x,y){
+  // 依畫面上的列（膠囊會換行）找插入點：同一列中第一個中心在指標右側的膠囊之前；都沒有就放在該列最後一個之後
+  const cs=[...wpListEl.querySelectorAll('.wp-chip')].map((el,i)=>({i, r:el.getBoundingClientRect()}));
+  if(!cs.length) return null;
+  const rows=[];
+  cs.forEach(c=>{ let R=rows.find(q=>Math.abs(q.top-c.r.top)<8);
+    if(!R){ R={top:c.r.top, bottom:c.r.bottom, items:[]}; rows.push(R); }
+    R.items.push(c); R.bottom=Math.max(R.bottom, c.r.bottom); });
+  rows.sort((p,q)=>p.top-q.top);
+  const R=rows.find(q=>y<=q.bottom+4) || rows[rows.length-1];
+  const hit=R.items.find(c=>x < c.r.left + c.r.width/2);
+  if(hit) return {idx:hit.i, ref:hit.r, before:true};
+  const last=R.items[R.items.length-1];
+  return {idx:last.i+1, ref:last.r, before:false};
+}
+function xbDragPaint(st){
+  const lift = st.touch ? 36 : 22;   // 把拖曳中的膠囊抬到指標／手指上方，底下的插入線才看得見
+  st.ghost.style.left=st.x+'px'; st.ghost.style.top=(st.y-lift)+'px';
+  const d=xbDropAt(st.x, st.y); st.drop=d;
+  const noop = !d || d.idx===st.i || d.idx===st.i+1;
+  st.caret.hidden = noop;
+  if(!noop){
+    const L0=wpListEl.getBoundingClientRect();
+    st.caret.style.left=((d.before ? d.ref.left-5.5 : d.ref.right+2.5) - L0.left)+'px';
+    st.caret.style.top=(d.ref.top-L0.top)+'px';
+    st.caret.style.height=d.ref.height+'px';
+  }
+}
+function xbDragEnd(e){
+  const st=XB_DRAG; if(!st || e.pointerId!==st.id) return;
+  const was=st.active, d=st.drop, from=st.i;
+  xbDragCleanup();
+  if(was && d && d.idx!==from && d.idx!==from+1) xbMoveWaypoint(from, d.idx>from ? d.idx-1 : d.idx);
+}
+function xbDragCancel(e){ const st=XB_DRAG; if(!st || e.pointerId!==st.id) return; xbDragCleanup(); }
+function xbDragCleanup(){
+  const st=XB_DRAG; XB_DRAG=null;
+  window.removeEventListener('pointermove', xbDragMove, {passive:false});
+  window.removeEventListener('pointerup', xbDragEnd);
+  window.removeEventListener('pointercancel', xbDragCancel);
+  if(!st) return;
+  clearTimeout(st.timer);
+  if(st.active) XB_DRAG_AT=Date.now();
+  if(st.ghost) st.ghost.remove();
+  if(st.caret) st.caret.remove();
+  st.chip.classList.remove('dragging'); document.body.classList.remove('wp-dragging');
 }
 
 // ----- suggestions -----
@@ -3058,7 +3257,7 @@ document.getElementById('gpxFile').addEventListener('change', async e=>{
 document.getElementById('gpxBtn').addEventListener('click', downloadGpx);
 document.getElementById('pdfBtn').addEventListener('click', downloadPdf);
 loadTdxStations();
-console.log("小布路書 v2.7.1 (2026-10-18) · 補給點全部標示＋PDF 報告 · 路網四道防線＋地圖圖例 · GPX/KML 匯入分析 · 桃園海岸騎點庫 · zh/en/ja · 離線快照＋沿線補給 · Komoot 834趟有效速度校準");
+console.log("小布路書 v2.7.2 (2026-11-20) · 新地點順路插入＋拖曳排序 · 補給點全部標示＋PDF 報告 · 路網四道防線＋地圖圖例 · GPX/KML 匯入分析 · 桃園海岸騎點庫 · zh/en/ja · 離線快照＋沿線補給 · Komoot 834趟有效速度校準");
 document.querySelectorAll('.lang-sw button').forEach(b=>b.addEventListener('click',()=>setLang(b.dataset.lang)));
 applyStatic();
 renderWaypoints();

@@ -68,3 +68,33 @@ globalThis.fetch = async (u)=>{ const s=String(u);
   return J({},false,500); };
 r = await run("./netlify/functions/tdx-stations.mts?1", new Request("http://x/api/stations"));
 console.log("tdx(ok):", r.body.stations);
+
+// ---- route v2.7: 吸附半徑與結構化錯誤 ----
+{
+  let calls=[];
+  const ok7k = ()=>{ const geom=[]; for(let i=0;i<10;i++) geom.push([121.55+0.001*i,25.08,10]);
+    return J({features:[{properties:{ascent:5,descent:5,summary:{distance:1500},segments:[{distance:1500,steps:[]}]},geometry:{coordinates:geom}}]}); };
+  // 情境一：預設模式回 2010（路點離可騎道路太遠）→ 換一般自行車模式成功
+  globalThis.fetch = async (u,o)=>{ const b=JSON.parse(o.body); calls.push({u:String(u), rad:b.radiuses});
+    if(calls.length===1) return {ok:false,status:404,json:async()=>({}),text:async()=>JSON.stringify({error:{code:2010,message:"Could not find routable point within a radius of 350.0 meters of specified coordinate 1"}})};
+    return ok7k(); };
+  r = await run("./netlify/functions/route.mts?v27a", post("http://x/api/route",{coordinates:[[121.55,25.08],[121.52,25.06]]}));
+  const okA = r.status===200 && calls.length===2 && calls[0].rad.every(x=>x===-1) && calls[1].u.includes("cycling-regular");
+  console.log("route(2010→regular):", okA ? "PASS" : "FAIL", r.status, calls.map(c=>c.u.split("/")[5]+":"+JSON.stringify(c.rad)).join(" | "));
+
+  // 情境二：配額用盡 429 → 立即停止，不再浪費兩次呼叫，回傳結構化原因
+  calls=[];
+  globalThis.fetch = async (u,o)=>{ calls.push(String(u)); return {ok:false,status:429,json:async()=>({}),text:async()=>JSON.stringify({error:"Rate Limit Exceeded"})}; };
+  r = await run("./netlify/functions/route.mts?v27b", post("http://x/api/route",{coordinates:[[121.55,25.08],[121.52,25.06]]}));
+  const okB = r.status===502 && calls.length===1 && r.body.error==="ORS 429" && /Rate Limit/.test(r.body.message);
+  console.log("route(429 stop):", okB ? "PASS" : "FAIL", JSON.stringify(r.body));
+
+  // 情境三：三次全敗 → 最後一次為 2 km 吸附，錯誤碼帶回前端
+  calls=[];
+  globalThis.fetch = async (u,o)=>{ const b=JSON.parse(o.body); calls.push(b.radiuses);
+    return {ok:false,status:404,json:async()=>({}),text:async()=>JSON.stringify({error:{code:2009,message:"Route could not be found"}})}; };
+  r = await run("./netlify/functions/route.mts?v27c", post("http://x/api/route",{coordinates:[[121.55,25.08],[121.52,25.06]]}));
+  const okC = r.status===502 && calls.length===3 && calls[2].every(x=>x===2000) && r.body.code===2009;
+  console.log("route(all fail):", okC ? "PASS" : "FAIL", JSON.stringify(r.body));
+  if(!(okA&&okB&&okC)) process.exitCode=1;
+}

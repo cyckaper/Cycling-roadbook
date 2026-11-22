@@ -913,7 +913,7 @@ zh:{
  bl_downS:'<i style="background:#4A6076"></i>陡降 低於−8%',
  mSummary:"這些時刻怎麼算？——834 趟實騎的校準方法",
  mBody:"<p>本站的抵達時刻不是理論值，而是從車主 2018–2026 年間以 Brompton 實際完成、記錄於 Komoot 的 939 趟騎乘中校準出來的。剔除非單車活動、短於 3 公里或缺時間戳的紀錄後，留下 <b>834 趟、約 31,790 公里、六百二十萬個軌跡點</b>。</p><p>每條軌跡先做高程清理：沿線以 ±100 公尺視窗中位數濾波去除尖刺，再每 30 公尺重取樣、±60 公尺移動平均平滑；坡度取 ±50 公尺視窗的高差比，據此把每一小段歸入七個坡度帶——陡降（≤−8%）、下坡、平路（−2〜2%）、緩坡、陡坡、很陡、極陡（&gt;12%）。</p><p>速度統計剔除近乎靜止（&lt;1.5 km/h）、GPS 突跳（&gt;80 km/h）與錄製斷點（相鄰點時距 ≥10 秒的橋接段）後，各帶採<b>有效速度＝Σ距離 ÷ Σ移動時間</b>——而非平均巡航速度：慢的路段按時間放大權重，算出來的才是「抵達時刻」真正需要的數字。樣本以近 24 個月為主，不足的帶回退全庫。</p><p>交叉驗證：全庫算得的平路有效速度 16.3 km/h，與另一趟獨立實騎量得、並通過沿線抵達時刻三分鐘誤差檢驗的 16.2 幾乎重合；各爬坡帶亦互相印證。唯一例外是極陡帶，樣本僅 29 公里且受高程雜訊污染，故採保守值。各帶數值見頁尾；每點停留時間由上方欄位另行輸入，不混入配速。</p>",
- colophon:'<b>小布路書</b> · Brompton Roadbook（原「單車騎行農民曆」）· 版本 <b>v2.7.2</b>（2026-11-20）<br>© 2026 Chang Chun-Yen · HEALS Design · 版權所有，未經授權請勿轉載<br>路線、坡度、天氣皆為推估，僅供參考；騎乘安全請自行評估。<br>路線距離＝直線距離 × 1.3 迂迴係數；爬升＝海拔差 + 每公里起伏估算；ETA 依坡度分段配速（平路16.3・緩坡12・陡坡8.2・很陡6.6・極陡4.5・下坡21.2・陡降19.7 km/h，2024–2026 Komoot 834 趟完騎有效速度校準）與每點停留推算；頂／順風由每段方位角與當時風向相減。<br>地名座標來自 Open-Meteo Geocoding 與 OpenStreetMap Nominatim、海拔來自 Open-Meteo；天氣為示範情境，實際以出發當日之逐時預報與現場風雨為準。',
+ colophon:'<b>小布路書</b> · Brompton Roadbook（原「單車騎行農民曆」）· 版本 <b>v2.7.3</b>（2026-11-22）<br>© 2026 Chang Chun-Yen · HEALS Design · 版權所有，未經授權請勿轉載<br>路線、坡度、天氣皆為推估，僅供參考；騎乘安全請自行評估。<br>路線距離＝直線距離 × 1.3 迂迴係數；爬升＝海拔差 + 每公里起伏估算；ETA 依坡度分段配速（平路16.3・緩坡12・陡坡8.2・很陡6.6・極陡4.5・下坡21.2・陡降19.7 km/h，2024–2026 Komoot 834 趟完騎有效速度校準）與每點停留推算；頂／順風由每段方位角與當時風向相減。<br>地名座標來自 Open-Meteo Geocoding 與 OpenStreetMap Nominatim、海拔來自 Open-Meteo；天氣為示範情境，實際以出發當日之逐時預報與現場風雨為準。',
  todayTerm:"今日節氣", yiChar:"宜", jiChar:"忌",
  emptyRoute:"打字搜尋地點、從清單挑選加入（或點熱門騎點）；湊滿兩點、設好出發時間與停留，按「開始分析」讀今天這條路線的天時。",
  statusGood:"今日宜騎", statusWarn:"可騎 · 留意時段", statusRisk:"審慎 · 有挑戰路段",
@@ -980,7 +980,8 @@ zh:{
  errFn:"無法連線 AI 解析服務 — 請確認已部署 Netlify Functions",
  errDeploy:"AI 解析服務未部署 — 請依 README 部署 Functions 並設定 ANTHROPIC_API_KEY",
  errFmt:"AI 回應格式異常", errNone:"AI 沒有從文字中讀出地點，換段文字試試",
- aiMissed:a=>"認得但定不了位、已略過："+a.join("、"), aiOk:n=>`已讀出 ${n} 個地點`,
+ aiMissed:a=>"認得但定不了位、已略過："+a.join("、"), aiOk:n=>`已讀出 ${n} 個地點`, aiKept:a=>`；手動加入的 ${a.join("、")} 已保留`,
+ aiKeep:"地點清單有你手動的調整，而文字沒有改，所以這次沒有重新解析（以免蓋掉你的調整）。要計算路線請按「開始分析」；想依文字整個重來，請先按「清空路線」。",
  escHere:"（即在此）", escPending:"—（附近車站待接 TDX）",
  tagSpot:"騎點", tagPlace:"地名",
  sugMore:"查詢更多地點…", sugErr:"外部地名查詢無回應，僅顯示內建騎點與車站", sugNone:"找不到相符地點，換個關鍵字試試",
@@ -1033,7 +1034,7 @@ en:{
  bl_downS:'<i style="background:#4A6076"></i>Steep down <−8%',
  mSummary:"How are these times computed? — calibrated on 834 real rides",
  mBody:"<p>Arrival times here are not theoretical. They are calibrated from 939 rides the owner actually completed on a Brompton between 2018–2026, recorded on Komoot. After removing non-cycling activities, rides under 3 km, and files without timestamps, <b>834 rides remain — about 31,790 km and 6.2 million track points</b>.</p><p>Each track first gets elevation cleaning: a ±100 m median filter along the line removes spikes, then 30 m resampling and a ±60 m moving average smooth the profile; grade is taken over a ±50 m window, and every short segment is assigned to one of seven bands — steep descent (≤−8%), downhill, flat (−2〜2%), gentle, steep, very steep, extreme (&gt;12%).</p><p>After excluding near-standstill samples (&lt;1.5 km/h), GPS spikes (&gt;80 km/h) and recording gaps (bridged segments with ≥10 s between points), each band uses <b>effective speed = Σdistance ÷ Σmoving time</b> — not average cruising speed: slow stretches are weighted by time, which is exactly what an arrival time needs. Samples favour the last 24 months, falling back to the full library where thin.</p><p>Cross-check: the library-wide flat effective speed of 16.3 km/h almost exactly matches 16.2 measured independently on a single ride that passed a 3-minute arrival-time test; climbing bands corroborate each other likewise. The one exception is the extreme band — only 29 km of noisy samples — so a conservative value is used. Band values are in the footer; stop time per waypoint is entered above and never mixed into pace.</p>",
- colophon:'<b>小布路書</b> · Xiaobu Roadbook — a Brompton Roadbook (formerly “A Cyclist’s Almanac”) · Version <b>v2.7.2</b> (2026-11-20)<br>© 2026 Chang Chun-Yen · HEALS Design · All rights reserved<br>Routes, grades and weather are estimates for reference only; assess riding safety yourself.<br>Fallback route length = straight-line × 1.3; climb = elevation gap + per-km undulation. ETA uses graded pace (flat 16.3 · gentle 12 · steep 8.2 · v-steep 6.6 · extreme 4.5 · down 21.2 · steep-down 19.7 km/h, effective speeds calibrated on 834 Komoot rides 2024–2026) plus stop time per waypoint; head/tailwind from segment bearing vs. hourly wind.<br>Geocoding by Open-Meteo Geocoding & OpenStreetMap Nominatim; elevation by Open-Meteo. Demo weather is illustrative — trust the day’s forecast and conditions on the road.',
+ colophon:'<b>小布路書</b> · Xiaobu Roadbook — a Brompton Roadbook (formerly “A Cyclist’s Almanac”) · Version <b>v2.7.3</b> (2026-11-22)<br>© 2026 Chang Chun-Yen · HEALS Design · All rights reserved<br>Routes, grades and weather are estimates for reference only; assess riding safety yourself.<br>Fallback route length = straight-line × 1.3; climb = elevation gap + per-km undulation. ETA uses graded pace (flat 16.3 · gentle 12 · steep 8.2 · v-steep 6.6 · extreme 4.5 · down 21.2 · steep-down 19.7 km/h, effective speeds calibrated on 834 Komoot rides 2024–2026) plus stop time per waypoint; head/tailwind from segment bearing vs. hourly wind.<br>Geocoding by Open-Meteo Geocoding & OpenStreetMap Nominatim; elevation by Open-Meteo. Demo weather is illustrative — trust the day’s forecast and conditions on the road.',
  todayTerm:"Today's solar term", yiChar:"Do", jiChar:"Skip",
  emptyRoute:"Type to search and pick places (or tap a popular spot); with two or more set, choose your start time and stops, then press Analyze.",
  statusGood:"A good day to ride", statusWarn:"Rideable · mind the timing", statusRisk:"Ride with care · challenging section",
@@ -1100,7 +1101,8 @@ en:{
  errFn:"Cannot reach the AI parsing service — check that Netlify Functions are deployed",
  errDeploy:"AI parsing not deployed — deploy Functions per README and set ANTHROPIC_API_KEY",
  errFmt:"Unexpected AI response format", errNone:"AI found no places in that text — try another passage",
- aiMissed:a=>"Recognised but couldn't locate, skipped: "+a.join(", "), aiOk:n=>`Read ${n} places`,
+ aiMissed:a=>"Recognised but couldn't locate, skipped: "+a.join(", "), aiOk:n=>`Read ${n} places`, aiKept:a=>`; kept the places you added by hand: ${a.join(", ")}`,
+ aiKeep:"You have adjusted the place list and the text has not changed, so it was not re-parsed (that would overwrite your changes). Press “Analyze” to compute the route; to start over from the text, press “Clear route” first.",
  escHere:" (right here)", escPending:"— (nearby stations pending TDX)",
  tagSpot:"spot", tagPlace:"place",
  sugMore:"Searching more places…", sugErr:"External geocoding unavailable — showing built-in spots and stations only", sugNone:"No matching place — try another keyword",
@@ -1153,7 +1155,7 @@ ja:{
  bl_downS:'<i style="background:#4A6076"></i>急降 −8%未満',
  mSummary:"この到着時刻はどう計算？——実走834本による校正",
  mBody:"<p>本サイトの到着時刻は理論値ではありません。オーナーが 2018–2026 年に Brompton で実際に完走し Komoot に記録した 939 本の走行から校正されています。自転車以外・3 km 未満・タイムスタンプ欠落を除き、<b>834 本・約 31,790 km・620 万トラックポイント</b>が残りました。</p><p>各トラックはまず標高クリーニング：沿線 ±100 m の中央値フィルタでスパイクを除去し、30 m ごとに再サンプル、±60 m 移動平均で平滑化。勾配は ±50 m 窓で取り、各区間を七つの帯——急降（≤−8%）・下り・平坦（−2〜2%）・緩坂・急坂・激坂・極坂（&gt;12%）——に振り分けます。</p><p>ほぼ静止（&lt;1.5 km/h）、GPS スパイク（&gt;80 km/h）、記録ギャップ（隣接点間 ≥10 秒のブリッジ区間）を除外した上で、各帯は<b>有効速度＝Σ距離 ÷ Σ移動時間</b>を採用——平均巡航速度ではありません。遅い区間ほど時間で重みが増し、それこそが「到着時刻」に必要な数字です。標本は直近 24 か月を主とし、不足帯は全期間で補完。</p><p>相互検証：全データの平坦有効速度 16.3 km/h は、独立した一本の実走で測られ沿線到着 3 分誤差の検証を通った 16.2 とほぼ一致。登坂帯も互いに整合します。唯一の例外は極坂帯（標本 29 km・ノイズ混入）で、保守値を採用。各帯の値はフッター参照。各地点の滞在時間は上の欄で別入力され、ペースには混ぜません。</p>",
- colophon:'<b>小布路書</b> · ブロンプトン・ロードブック（旧「単車騎行農民暦」）· バージョン <b>v2.7.2</b>（2026-11-20）<br>© 2026 Chang Chun-Yen · HEALS Design · 無断転載を禁じます<br>ルート・勾配・天気は推定であり参考情報です。走行の安全はご自身で判断してください。<br>簡易時：距離＝直線 × 1.3、獲得標高＝標高差＋km あたり起伏。ETA は勾配別ペース（平坦16.3・緩坂12・急坂8.2・激坂6.6・極坂4.5・下り21.2・急降19.7 km/h、2024–2026 Komoot 実走834本の有効速度で校正）と各地点滞在から算出。向かい風／追い風は区間方位と毎時風向の差。<br>地名は Open-Meteo Geocoding と OpenStreetMap Nominatim、標高は Open-Meteo。デモ天気は例示であり、当日の予報と現地の風雨を優先してください。',
+ colophon:'<b>小布路書</b> · ブロンプトン・ロードブック（旧「単車騎行農民暦」）· バージョン <b>v2.7.3</b>（2026-11-22）<br>© 2026 Chang Chun-Yen · HEALS Design · 無断転載を禁じます<br>ルート・勾配・天気は推定であり参考情報です。走行の安全はご自身で判断してください。<br>簡易時：距離＝直線 × 1.3、獲得標高＝標高差＋km あたり起伏。ETA は勾配別ペース（平坦16.3・緩坂12・急坂8.2・激坂6.6・極坂4.5・下り21.2・急降19.7 km/h、2024–2026 Komoot 実走834本の有効速度で校正）と各地点滞在から算出。向かい風／追い風は区間方位と毎時風向の差。<br>地名は Open-Meteo Geocoding と OpenStreetMap Nominatim、標高は Open-Meteo。デモ天気は例示であり、当日の予報と現地の風雨を優先してください。',
  todayTerm:"今日の節気", yiChar:"宜", jiChar:"忌",
  emptyRoute:"地名を入力して候補から追加（人気スポットのタップでも可）。2 地点以上そろえ、出発時刻と滞在を設定したら「分析開始」で天時を読みます。",
  statusGood:"本日、走るに宜し", statusWarn:"走行可 · 時間帯に注意", statusRisk:"慎重に · 難所あり",
@@ -1220,7 +1222,8 @@ ja:{
  errFn:"AI 解析サービスに接続できません — Netlify Functions の配備を確認",
  errDeploy:"AI 解析が未配備 — README に従い Functions と ANTHROPIC_API_KEY を設定",
  errFmt:"AI 応答の形式が不正", errNone:"AI が地名を読み取れませんでした。別の文章でお試しを",
- aiMissed:a=>"認識したが位置特定できずスキップ："+a.join("、"), aiOk:n=>`${n} 地点を読み取りました`,
+ aiMissed:a=>"認識したが位置特定できずスキップ："+a.join("、"), aiOk:n=>`${n} 地点を読み取りました`, aiKept:a=>`。手動で追加した ${a.join("、")} は残しました`,
+ aiKeep:"地点リストを手動で調整済みで、文章は変わっていないため再解析しませんでした（調整が上書きされないように）。ルート計算は「分析開始」を、文章からやり直す場合は先に「ルートを消去」を押してください。",
  escHere:"（当地）", escPending:"—（近隣駅は TDX 接続待ち）",
  tagSpot:"スポット", tagPlace:"地点",
  sugMore:"さらに検索中…", sugErr:"外部地名検索が無応答 — 内蔵スポットと駅のみ表示", sugNone:"該当なし — 別のキーワードでお試しを",
@@ -1890,9 +1893,27 @@ async function computeRetreats(){
 }
 
 // ---------- AI extraction flow ----------
+// v2.7.3：AI 重新解析不再蓋掉手動調整——文字沒改就不重解析；文字改了，手動加入的地點依順路位置補回。
+// 定位分兩輪：先依序定位，再以整條路線的中心找出離群點（同名異地）重新定位。
+var XB_AI_TEXT=null, XB_WP_EDITED=false;
+function xbLooseName(s){ return normName(String(s||'')).replace(/(鄉|鎮|市|區|村|里)$/,''); }
+function xbLooseSame(a,b){ return xbLooseName(a.n)===xbLooseName(b.n) || haversine(a,b)<0.3; }
+function xbMedianCenter(ws){
+  const m=arr=>{ const v=arr.slice().sort((p,q)=>p-q), h=v.length>>1; return v.length%2 ? v[h] : (v[h-1]+v[h])/2; };
+  return {lat:m(ws.map(w=>w.lat)), lng:m(ws.map(w=>w.lng))};
+}
+function xbLocalPick(name){
+  // 內建地名表（騎點、車站）可直接採信的候選，依表內順序
+  return localMatches(name).filter(c=>xbLocalEq(c, name))
+    .map(c=>c.kind==='gaz'?wpFromGaz(c.g):c.kind==='sta'?wpFromStation(c.s):null).filter(Boolean);
+}
 async function aiParse(){
   const ta=document.getElementById('tripText'), btn=document.getElementById('aiBtn'), note=document.getElementById('aiNote');
   const text=ta.value.trim(); if(!text) return;
+  if(XB_WP_EDITED && WAYPOINTS.length && text===XB_AI_TEXT){
+    // 文字沒變、清單又手動調整過：重新解析只會蓋掉調整，所以不做
+    note.className="ai-note"; note.textContent=tx('aiKeep'); return;
+  }
   btn.disabled=true; btn.textContent=tx('aiBusy'); note.className="ai-note"; note.textContent="";
   showLoading(tx('aiBusy'));
   const fail=(msg)=>{ note.className="ai-note err"; note.textContent=msg;
@@ -1905,26 +1926,62 @@ async function aiParse(){
   if(!j || j.error || !Array.isArray(j.waypoints)) return fail(j&&j.error ? j.error : tx('errFmt'));
   if(!j.waypoints.length) return fail(tx('errNone'));
 
-  const located=[], missed=[]; let last=null;
+  // 第一輪：依序定位（內建地名表優先，其餘線上定位，以前一點為參考）
+  const slots=[]; let last=null;
   for(let i=0;i<j.waypoints.length;i++){
     const wpt=j.waypoints[i];
     showLoading(tx('ldLocate')(i+1, j.waypoints.length, wpt.name));
     let w=null;
     const loc=localMatches(wpt.name);
-    if(loc.length){
-      const top=loc[0], eq=xbLocalEq(top, wpt.name);
-      if(eq) w = top.kind==='gaz'?wpFromGaz(top.g) : top.kind==='sta'?wpFromStation(top.s) : null;
+    if(loc.length && xbLocalEq(loc[0], wpt.name)){
+      const top=loc[0]; w = top.kind==='gaz'?wpFromGaz(top.g) : top.kind==='sta'?wpFromStation(top.s) : null;
     }
     if(!w){
       const rs=await xbGeocode(wpt.name, wpt.region||"", last, {gate:true});
       if(rs&&rs[0]) w=wpFromGeo({n:wpt.name,lat:rs[0].lat,lng:rs[0].lng,elev:null});
     }
-    if(w && last && haversine(last,w)>500){ missed.push(wpt.name); }
-    else if(w && last && (normName(w.n)===normName(last.n) || haversine(last,w)<0.15)){ /* 連續重複,靜默併合 */ }
-    else if(w){ located.push(w); last=w; } else missed.push(wpt.name);
+    slots.push({wpt, w});
+    if(w) last=w;
   }
-  GPXDATA=null; WAYPOINTS=located; renderWaypoints();
-  note.textContent = missed.length ? tx('aiMissed')(missed) : tx('aiOk')(located.length);
+  // 第二輪：離整條路線中心太遠的點多半是同名異地，以中心為參考重找；找不到就列為「定不了位」
+  const got=slots.filter(x=>x.w);
+  if(got.length>=3){
+    const C=xbMedianCenter(got.map(x=>x.w));
+    const ds=got.map(x=>haversine(C,x.w)).sort((p,q)=>p-q);
+    const lim=Math.max(80, 2.5*ds[ds.length>>1]);
+    for(let i=0;i<slots.length;i++){
+      const x=slots[i];
+      if(x.w && haversine(C,x.w)<=lim) continue;
+      showLoading(tx('ldLocate')(i+1, slots.length, x.wpt.name));
+      let alt=xbLocalPick(x.wpt.name).filter(w=>haversine(C,w)<=lim).sort((p,q)=>haversine(C,p)-haversine(C,q))[0]||null;
+      if(!alt){
+        const rs=await xbGeocode(x.wpt.name, x.wpt.region||"", C, {gate:true});
+        const ok=(rs||[]).find(r=>haversine(C,{lat:r.lat,lng:r.lng})<=lim);
+        if(ok) alt=wpFromGeo({n:x.wpt.name,lat:ok.lat,lng:ok.lng,elev:null});
+      }
+      x.w=alt;
+    }
+  }
+  const located=[], missed=[]; let prev=null;
+  for(const x of slots){
+    const w=x.w;
+    if(!w || (prev && haversine(prev,w)>500)){ missed.push(x.wpt.name); continue; }
+    if(prev && (normName(w.n)===normName(prev.n) || haversine(prev,w)<0.15)) continue;   // 連續重複，靜默併合
+    located.push(w); prev=w;
+  }
+  if(!located.length) return fail(missed.length ? tx('aiMissed')(missed) : tx('errNone'));
+  // 手動加入的地點：新清單沒有、又在這條路線附近，就依順路位置補回（換了別處的行程就不帶過去）
+  const manual=WAYPOINTS.filter(w=>w.manual), nAi=located.length;
+  GPXDATA=null; WAYPOINTS=located;
+  const kept=[];
+  manual.forEach(m=>{
+    if(WAYPOINTS.some(p=>xbLooseSame(p,m))) return;
+    if(Math.min(...WAYPOINTS.map(p=>haversine(p,m)))>30) return;
+    WAYPOINTS.splice(xbInsertAt(m),0,m); kept.push(m.n);
+  });
+  XB_AI_TEXT=text; XB_WP_EDITED=false;
+  renderWaypoints(); xbWpNote('');
+  note.textContent = (missed.length ? tx('aiMissed')(missed) : tx('aiOk')(nAi)) + (kept.length ? tx('aiKept')(kept) : '');
   btn.disabled=false; btn.textContent=tx('aiBtn');
   NEED_RUN=true; paintGo();
   renderRoute();
@@ -2085,6 +2142,7 @@ function loadSnapObj(){
 function restoreSnap(){
   const s=loadSnapObj(); if(!s) return false;
   WAYPOINTS=s.wp; ROUTE=WAYPOINTS.slice(); SEGDATA=s.seg||[];
+  XB_AI_TEXT=null; XB_WP_EDITED=false; try{ xbWpNote(''); }catch(e){}
   WXMAP=new Map(s.wx||[]); WXSRC=s.src||{k:'demo'}; SUPPLY=s.sup||[];
   START=s.start; DWELL=s.dwell; REVERSED=!!s.rev; START_DATE=new Date(s.date);
   const di=document.getElementById('startDate'); if(di&&!isNaN(START_DATE)) di.value=dateISO(START_DATE);
@@ -2371,7 +2429,7 @@ function renderMapLegend(st){
 // ---------- PDF 報告（v2.7.1）：整份分析存成 A4 PDF ----------
 // 文字區塊以 html2canvas-pro 擷取（支援 color-mix 等新式色彩），地圖另以 canvas 依 Web Mercator 重繪（底圖＋路線＋補給＋路點），
 // jsPDF 排版：A4 直式、紙色底、區塊不跨頁，時間軸在站點／路段交界處換頁。兩個函式庫只在按下按鈕時才載入。
-var XB_VER='v2.7.2', XB_PDF_BUSY=false, XB_PDF_BG='#F3EEE2';
+var XB_VER='v2.7.3', XB_PDF_BUSY=false, XB_PDF_BG='#F3EEE2';
 function xbLoadScript(src){
   return new Promise((res,rej)=>{
     const sc=document.createElement('script'); sc.src=src; sc.async=true;
@@ -2712,6 +2770,7 @@ function addWaypoint(w){
   if(n && xbSameSpot(WAYPOINTS[n-1], w)){ xbWpNote(tx('wpDup')(w.n)); wpInput.focus(); return; }
   const revisit = WAYPOINTS.some(p=>xbSameSpot(p,w));
   const k=xbInsertAt(w);
+  w.manual=true; XB_WP_EDITED=true;
   WAYPOINTS.splice(k,0,w);
   GPXDATA=null;
   renderWaypoints(n>=2?k:-1); NEED_RUN=true; paintGo();
@@ -2722,13 +2781,13 @@ function addWaypoint(w){
   else xbWpNote(tx('wpIns')(w.n, k+1, WAYPOINTS[k-1].n, WAYPOINTS[k+1].n), w);
   wpInput.focus();
 }
-function removeWaypoint(i){ WAYPOINTS.splice(i,1); renderWaypoints(); NEED_RUN=true; paintGo(); xbWpNote(''); }
+function removeWaypoint(i){ WAYPOINTS.splice(i,1); XB_WP_EDITED=true; renderWaypoints(); NEED_RUN=true; paintGo(); xbWpNote(''); }
 function xbMoveWaypoint(from,to,focus){
   const n=WAYPOINTS.length;
   if(from===to || from<0 || from>=n || to<0 || to>=n) return;
   const wasGpx=!!GPXDATA;
   const [w]=WAYPOINTS.splice(from,1); WAYPOINTS.splice(to,0,w);
-  GPXDATA=null;
+  GPXDATA=null; XB_WP_EDITED=true;
   renderWaypoints(to); NEED_RUN=true; paintGo();
   xbWpNote(tx('wpMoved')(w.n,to+1)+(wasGpx?tx('wpGpxOff'):''));
   if(focus){ const el=wpListEl.querySelectorAll('.wp-chip')[to]; if(el) el.focus(); }
@@ -2946,7 +3005,7 @@ wpInput.addEventListener('keydown', e=>{
 document.addEventListener('click', e=>{ if(!e.target.closest('.combo')) hideSuggest(); });
 
 // ----- controls -----
-document.getElementById('clearBtn').addEventListener('click',()=>{ GPXDATA=null; WAYPOINTS=[]; ROUTE=[]; SEGDATA=[]; SUPPLY=[]; NEED_RUN=false; renderWaypoints(); renderRoute(); renderMap(); paintGo(); paintSnapBar(); });
+document.getElementById('clearBtn').addEventListener('click',()=>{ XB_AI_TEXT=null; XB_WP_EDITED=false; xbWpNote(''); GPXDATA=null; WAYPOINTS=[]; ROUTE=[]; SEGDATA=[]; SUPPLY=[]; NEED_RUN=false; renderWaypoints(); renderRoute(); renderMap(); paintGo(); paintSnapBar(); });
 document.getElementById('startDate').value = dateISO(START_DATE);
 document.getElementById('startDate').addEventListener('input', async e=>{
   const v=e.target.value; if(!v) return;
@@ -2981,6 +3040,7 @@ document.getElementById('gpxFile').addEventListener('change', async e=>{
     if(p.mode==='rte-sparse'){
       GPXDATA=null;
       WAYPOINTS=p.rpts.map((r,i)=>wpFromGeo({n:r.n||tx('wpVia')(i+1,''), lat:r.lat, lng:r.lng, elev:null}));
+      XB_AI_TEXT=null; XB_WP_EDITED=false; xbWpNote('');
       renderWaypoints(); NEED_RUN=true; paintGo(); renderRoute();
       note.textContent=tx('gpxRte')(WAYPOINTS.length);
       return;
@@ -2999,6 +3059,7 @@ document.getElementById('gpxFile').addEventListener('change', async e=>{
     p.cum=xbTrackCum(p.track);
     GPXDATA=p;
     WAYPOINTS=xbGpxWaypoints(p.track,p.cum,p.wpts);
+    XB_AI_TEXT=null; XB_WP_EDITED=false; xbWpNote('');
     renderWaypoints(); NEED_RUN=true; paintGo(); renderRoute();
     note.textContent=tx('gpxLoaded')(p.track.length, p.cum[p.cum.length-1].toFixed(0), WAYPOINTS.length);
   }catch(err){ note.textContent=tx('gpxBad'); }
@@ -3006,7 +3067,7 @@ document.getElementById('gpxFile').addEventListener('change', async e=>{
 document.getElementById('gpxBtn').addEventListener('click', downloadGpx);
 document.getElementById('pdfBtn').addEventListener('click', downloadPdf);
 loadTdxStations();
-console.log("小布路書 v2.7.2 (2026-11-20) · 新地點順路插入＋拖曳排序 · 補給點全部標示＋PDF 報告 · 路網四道防線＋地圖圖例 · GPX/KML 匯入分析 · 桃園海岸騎點庫 · zh/en/ja · 離線快照＋沿線補給 · Komoot 834趟有效速度校準");
+console.log("小布路書 v2.7.3 (2026-11-22) · 重新解析保留手動調整＋同名異地重找 · 新地點順路插入＋拖曳排序 · 補給點全部標示＋PDF 報告 · 路網四道防線＋地圖圖例 · GPX/KML 匯入分析 · 桃園海岸騎點庫 · zh/en/ja · 離線快照＋沿線補給 · Komoot 834趟有效速度校準");
 document.querySelectorAll('.lang-sw button').forEach(b=>b.addEventListener('click',()=>setLang(b.dataset.lang)));
 applyStatic();
 renderWaypoints();
